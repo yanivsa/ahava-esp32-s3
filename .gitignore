@@ -1,0 +1,10 @@
+.pio/
+.DS_Store
+tmp/
+*.mp4
+*.log
+auto_read.py
+boot_app.py
+check_logs*.py
+read_*.py
+reset_*.py

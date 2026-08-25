@@ -1,0 +1,45 @@
+name: Build and publish firmware
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: firmware-release
+  cancel-in-progress: true
+
+jobs:
+  firmware:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install PlatformIO
+        run: pip install 'platformio==6.1.18'
+
+      - name: Build application
+        run: pio run -e spotpear-esp32s3-max35
+
+      - name: Verify firmware artifact
+        run: |
+          test -s .pio/build/spotpear-esp32s3-max35/firmware.bin
+          sha256sum .pio/build/spotpear-esp32s3-max35/firmware.bin
+
+      - name: Replace latest OTA release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete latest --cleanup-tag --yes || true
+          gh release create latest \
+            .pio/build/spotpear-esp32s3-max35/firmware.bin#firmware.bin \
+            --title "Latest ESP32 firmware" \
+            --notes "Automated firmware build from commit $GITHUB_SHA" \
+            --latest
