@@ -26,7 +26,12 @@ bool ota_manager_init(void) {
     // Set Wi-Fi to Station mode
     WiFi.mode(WIFI_STA);
     WiFi.setAutoReconnect(true);
-    WiFi.begin();  // Reuse credentials saved by the one-time captive portal.
+    if (WiFi.SSID().length() > 0) {
+        WiFi.begin();  // Reuse credentials saved by the one-time captive portal.
+        Serial.println("[OTA] Connecting to the saved Wi-Fi network in background.");
+    } else {
+        Serial.println("[OTA] No saved Wi-Fi yet; provisioning will start when OTA is pressed.");
+    }
     
     Serial.println("[OTA] Wi-Fi & OTA Manager initialized (Station mode).");
     return true;

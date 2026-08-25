@@ -506,6 +506,7 @@ void ui_screen_dashboard_init(lv_obj_t *scr) {
     lv_obj_t *lbl_energy = lv_label_create(hud);
     lv_obj_add_style(lbl_energy, &style_subtitle_hebrew, LV_PART_MAIN);
     lv_label_set_text(lbl_energy, "5/5");
+    lv_obj_set_style_text_font(lbl_energy, &lv_font_hebrew_16, LV_PART_MAIN);
 
     // Coins 🪙 (Dynamically loaded from NVS)
     lv_obj_t *lbl_coins = lv_label_create(hud);
@@ -513,6 +514,7 @@ void ui_screen_dashboard_init(lv_obj_t *scr) {
     char coins_buf[32];
     snprintf(coins_buf, sizeof(coins_buf), "%u מטבעות", (unsigned int)current_coins);
     lv_label_set_text(lbl_coins, coins_buf);
+    lv_obj_set_style_text_font(lbl_coins, &lv_font_hebrew_16, LV_PART_MAIN);
 
     // XP (Dynamically loaded from NVS)
     lv_obj_t *lbl_xp = lv_label_create(hud);
@@ -520,6 +522,7 @@ void ui_screen_dashboard_init(lv_obj_t *scr) {
     char xp_buf[32];
     snprintf(xp_buf, sizeof(xp_buf), "%u XP", (unsigned int)current_xp);
     lv_label_set_text(lbl_xp, xp_buf);
+    lv_obj_set_style_text_font(lbl_xp, &lv_font_hebrew_16, LV_PART_MAIN);
     
     #if BSP_OTA_ENABLED
     // OTA button is exposed only when a trusted endpoint is provisioned.
@@ -530,6 +533,7 @@ void ui_screen_dashboard_init(lv_obj_t *scr) {
     lv_obj_add_event_cb(ota_btn, on_ota_button_clicked, LV_EVENT_CLICKED, NULL);
     lv_obj_t *ota_lbl = lv_label_create(ota_btn);
     lv_label_set_text(ota_lbl, "OTA");
+    lv_obj_set_style_text_font(ota_lbl, &lv_font_hebrew_16, LV_PART_MAIN);
     lv_obj_center(ota_lbl);
     #endif
 
@@ -541,7 +545,7 @@ void ui_screen_dashboard_init(lv_obj_t *scr) {
     lv_obj_add_event_cb(back_btn, on_back_to_profiles_clicked, LV_EVENT_CLICKED, NULL);
     lv_obj_t *back_lbl = lv_label_create(back_btn);
     lv_label_set_text(back_lbl, "החלף");
-    lv_obj_set_style_text_font(back_lbl, &lv_font_hebrew_24, LV_PART_MAIN);
+    lv_obj_set_style_text_font(back_lbl, &lv_font_hebrew_16, LV_PART_MAIN);
     lv_obj_center(back_lbl);
 
     /* ---------------------------------------------------------------------- */
@@ -587,7 +591,7 @@ void ui_screen_dashboard_init(lv_obj_t *scr) {
         snprintf(title_buf, sizeof(title_buf), "%s · %u שאלות", titles[i],
                  (unsigned)quiz_get_question_count(current_profile, i));
         lv_label_set_text(title_lbl, title_buf);
-        lv_obj_set_style_text_font(title_lbl, &lv_font_hebrew_24, LV_PART_MAIN);
+        lv_obj_set_style_text_font(title_lbl, &lv_font_hebrew_16, LV_PART_MAIN);
         lv_obj_set_style_text_color(title_lbl, lv_color_hex(0xFFFFFF), LV_PART_MAIN);
         lv_obj_set_style_base_dir(title_lbl, LV_BASE_DIR_RTL, LV_PART_MAIN);
         lv_obj_align(title_lbl, LV_ALIGN_TOP_RIGHT, 0, 0);
