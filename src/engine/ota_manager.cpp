@@ -69,11 +69,12 @@ bool ota_manager_init(void) {
         WiFi.persistent(true);
         WiFi.begin(DEFAULT_WIFI_SSID, DEFAULT_WIFI_PASS);
         Serial.println("[OTA] Connecting to the locally configured Wi-Fi network in background.");
-    } else if (WiFi.SSID().length() > 0) {
-        WiFi.begin();  // Reuse credentials saved by the one-time captive portal.
-        Serial.println("[OTA] Connecting to the saved Wi-Fi network in background.");
     } else {
-        Serial.println("[OTA] No saved Wi-Fi yet; provisioning will start when OTA is pressed.");
+        // WiFi.SSID() is empty until the station is started on this Arduino core,
+        // even when credentials are present in NVS. Begin first and let ESP-IDF
+        // restore them; if none exist the OTA button will open provisioning.
+        WiFi.begin();
+        Serial.println("[OTA] Restoring saved Wi-Fi credentials in background.");
     }
     
     Serial.println("[OTA] Wi-Fi & OTA Manager initialized (Station mode).");
