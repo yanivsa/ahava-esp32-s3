@@ -37,11 +37,25 @@ static const Question_t* question_at(size_t index) {
     return nullptr;
 }
 
+static bool selectable_for_profile(size_t index, const Question_t *q,
+                                   WizardProfile_t profile, int subject_filter) {
+    if (!q || q->target_profile != profile) return false;
+    if (subject_filter >= 0 && q->subject_id != subject_filter) return false;
+
+    /* Ori's Judaism world now intentionally uses the reviewed precision bank
+       only. The legacy 31 Judaism questions remain embedded for compatibility
+       and auditability but are retired from Ori's active rotation. */
+    if (profile == PROFILE_ORI && q->subject_id == 3 && index < BASE_QUESTION_COUNT) {
+        return false;
+    }
+    return true;
+}
+
 static void hint_close_clicked(lv_event_t *e) {
     if (lv_event_get_code(e) != LV_EVENT_CLICKED) return;
     audio_play_click();
     lv_obj_t *mbox = static_cast<lv_obj_t *>(lv_event_get_user_data(e));
-    if (mbox) lv_obj_delete(mbox);
+    if (mbox) lv_msgbox_close(mbox);
 }
 
 static void show_hint(const Question_t *q) {
@@ -49,7 +63,10 @@ static void show_hint(const Question_t *q) {
         ? q->hint
         : "נסה שוב. חפש את הפרט המדויק שמבדיל בין האפשרויות.";
 
-    lv_obj_t *mbox = lv_msgbox_create(lv_screen_active());
+    /* parent=NULL makes LVGL create a full-screen backdrop. This prevents a
+       second answer from being tapped underneath the hint dialog. */
+    lv_obj_t *mbox = lv_msgbox_create(NULL);
+    if (!mbox) return;
     lv_obj_set_style_base_dir(mbox, LV_BASE_DIR_RTL, LV_PART_MAIN);
     lv_obj_set_style_bg_color(mbox, lv_color_hex(COLOR_BG_CARD), LV_PART_MAIN);
     lv_obj_set_style_border_color(mbox, lv_color_hex(0xF59E0B), LV_PART_MAIN);
@@ -170,10 +187,10 @@ bool quiz_validate_database(void) {
             size_t count = 0;
             for (size_t i = 0; i < QUESTION_COUNT; ++i) {
                 const Question_t *q = question_at(i);
-                if (q && q->target_profile == profile && q->subject_id == subject) ++count;
+                if (selectable_for_profile(i, q, (WizardProfile_t)profile, subject)) ++count;
             }
             if (count < 3) {
-                Serial.printf("[QUIZ] Missing coverage profile=%d subject=%d count=%u\n",
+                Serial.printf("[QUIZ] Missing active coverage profile=%d subject=%d count=%u\n",
                               profile, subject, (unsigned)count);
                 ok = false;
             }
@@ -192,14 +209,14 @@ const Question_t* quiz_get_next_question(WizardProfile_t profile, int subject_id
     size_t count = 0;
     for (size_t i = 0; i < QUESTION_COUNT; ++i) {
         const Question_t *q = question_at(i);
-        if (q && q->target_profile == profile && q->subject_id == subject_id) ++count;
+        if (selectable_for_profile(i, q, profile, subject_id)) ++count;
     }
     if (!count) return nullptr;
 
     size_t target = next_match[profile][subject_id]++ % count;
     for (size_t i = 0; i < QUESTION_COUNT; ++i) {
         const Question_t *q = question_at(i);
-        if (q && q->target_profile == profile && q->subject_id == subject_id && target-- == 0) {
+        if (selectable_for_profile(i, q, profile, subject_id) && target-- == 0) {
             active_question = q;
             hinted_question_id = -1;
             Serial.printf("[QUIZ] Question id=%d profile=%d subject=%d\n",
@@ -219,7 +236,7 @@ size_t quiz_get_question_count(WizardProfile_t profile, int subject_id) {
     size_t count = 0;
     for (size_t i = 0; i < QUESTION_COUNT; ++i) {
         const Question_t *q = question_at(i);
-        if (q && q->target_profile == profile && (subject_id < 0 || q->subject_id == subject_id)) ++count;
+        if (selectable_for_profile(i, q, profile, subject_id)) ++count;
     }
     return count;
 }
