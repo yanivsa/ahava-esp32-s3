@@ -34,7 +34,8 @@ for (const [profile, bank] of profiles) {
       // answers that remain completely readable at the compact Hebrew font.
       if (String(q.text).length > 120 || q.options.some(option => String(option).length > 35)) continue;
       const feedback = q.explanation || q.hint || 'התשובה נבדקה מול מאגר Ahava.';
-      rows.push(`    {${numericId++}, ${subjectId}, ${profile}, ${cpp(q.text)}, {${q.options.map(cpp).join(', ')}}, ${q.answer}, ${cpp(feedback)}}`);
+      const hint = q.hint || '';
+      rows.push(`    {${numericId++}, ${subjectId}, ${profile}, ${cpp(q.text)}, {${q.options.map(cpp).join(', ')}}, ${q.answer}, ${cpp(feedback)}, ${cpp(hint)}}`);
     }
   }
 }
