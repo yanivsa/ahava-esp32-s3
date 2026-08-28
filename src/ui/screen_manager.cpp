@@ -131,32 +131,152 @@ static void on_msgbox_continue_clicked(lv_event_t *e) {
 }
 
 /* ========================================================================== */
-/*                         OTA UPDATE TRIGGER                                 */
+/*                         OTA UPDATE TRIGGER & PROGRESS MODAL                */
 /* ========================================================================== */
 
-static void on_ota_button_clicked(lv_event_t *e) {
+static lv_obj_t *ota_modal_box = NULL;
+static lv_obj_t *ota_status_lbl = NULL;
+static lv_obj_t *ota_pct_lbl = NULL;
+static lv_obj_t *ota_progress_bar = NULL;
+static lv_obj_t *ota_close_btn = NULL;
+static lv_timer_t *ota_update_timer = NULL;
+
+static void on_ota_close_clicked(lv_event_t *e) {
     if (lv_event_get_code(e) == LV_EVENT_CLICKED) {
         audio_play_click();
-
-        // Show OTA progress modal
-        lv_obj_t *mbox = lv_msgbox_create(lv_screen_active());
-        lv_obj_set_style_base_dir(mbox, LV_BASE_DIR_RTL, LV_PART_MAIN);
-        lv_obj_set_style_bg_color(mbox, lv_color_hex(COLOR_BG_CARD), LV_PART_MAIN);
-        lv_obj_set_style_border_color(mbox, lv_color_hex(0x38BDF8), LV_PART_MAIN); // Sky Blue
-        lv_obj_set_style_border_width(mbox, 2, LV_PART_MAIN);
-        lv_obj_set_style_radius(mbox, 18, LV_PART_MAIN);
-        lv_obj_set_size(mbox, 280, LV_SIZE_CONTENT);
-        lv_obj_center(mbox);
-
-        lv_msgbox_add_title(mbox, "🔄 עדכון קושחה OTA");
-        lv_msgbox_add_text(mbox,
-            "מתחבר ל-Wi-Fi ומוריד עדכון.\n"
-            "בהפעלה הראשונה: התחברו לרשת Ahava-Setup,\n"
-            "סיסמה Ahava1234, ובחרו את הרשת הביתית.");
-
-        Serial.println("[UI] Launching OTA update sequence...");
-        ota_start_async_update(DEFAULT_OTA_FIRMWARE_URL);
+        if (ota_update_timer) {
+            lv_timer_delete(ota_update_timer);
+            ota_update_timer = NULL;
+        }
+        if (ota_modal_box) {
+            lv_obj_delete(ota_modal_box);
+            ota_modal_box = NULL;
+        }
+        ota_reset_status();
     }
+}
+
+static void ota_ui_timer_cb(lv_timer_t *timer) {
+    (void)timer;
+    if (!ota_modal_box) return;
+
+    OtaStatus_t status = ota_get_status();
+    uint8_t pct = ota_get_progress_pct();
+    const char *msg = ota_get_status_message();
+
+    if (ota_status_lbl) {
+        lv_label_set_text(ota_status_lbl, msg);
+    }
+
+    if (ota_progress_bar) {
+        lv_bar_set_value(ota_progress_bar, pct, LV_ANIM_ON);
+    }
+
+    if (ota_pct_lbl) {
+        char buf[32];
+        snprintf(buf, sizeof(buf), "%u%%", (unsigned int)pct);
+        lv_label_set_text(ota_pct_lbl, buf);
+    }
+
+    if (status == OTA_STATUS_SUCCESS) {
+        lv_obj_set_style_border_color(ota_modal_box, lv_color_hex(0x10B981), LV_PART_MAIN); // Green
+        if (ota_close_btn) lv_obj_add_flag(ota_close_btn, LV_OBJ_FLAG_HIDDEN);
+    } else if (status == OTA_STATUS_FAILED) {
+        lv_obj_set_style_border_color(ota_modal_box, lv_color_hex(0xEF4444), LV_PART_MAIN); // Red
+        if (ota_close_btn) lv_obj_remove_flag(ota_close_btn, LV_OBJ_FLAG_HIDDEN);
+    } else if (status == OTA_STATUS_PORTAL_ACTIVE) {
+        lv_obj_set_style_border_color(ota_modal_box, lv_color_hex(0xF59E0B), LV_PART_MAIN); // Amber
+        if (ota_close_btn) lv_obj_remove_flag(ota_close_btn, LV_OBJ_FLAG_HIDDEN);
+    } else {
+        // Downloading / connecting
+        if (ota_close_btn) lv_obj_add_flag(ota_close_btn, LV_OBJ_FLAG_HIDDEN);
+    }
+}
+
+static void on_ota_button_clicked(lv_event_t *e) {
+    if (lv_event_get_code(e) != LV_EVENT_CLICKED) return;
+    audio_play_click();
+
+    // Prevent opening multiple modal dialogs
+    if (ota_modal_box != NULL) return;
+
+    lv_obj_t *active_scr = lv_screen_active();
+
+    // 1. Create Modal Dialog Container
+    ota_modal_box = lv_obj_create(active_scr);
+    theme_apply_card(ota_modal_box);
+    lv_obj_set_size(ota_modal_box, 290, 290);
+    lv_obj_center(ota_modal_box);
+    lv_obj_set_style_border_color(ota_modal_box, lv_color_hex(0x38BDF8), LV_PART_MAIN);
+    lv_obj_set_style_border_width(ota_modal_box, 2, LV_PART_MAIN);
+    lv_obj_set_style_shadow_width(ota_modal_box, 25, LV_PART_MAIN);
+    lv_obj_set_style_shadow_color(ota_modal_box, lv_color_hex(0x000000), LV_PART_MAIN);
+    lv_obj_set_style_shadow_opa(ota_modal_box, (lv_opa_t)LV_OPA_70, LV_PART_MAIN);
+    lv_obj_remove_flag(ota_modal_box, LV_OBJ_FLAG_SCROLLABLE);
+
+    // 2. Title Label
+    lv_obj_t *title_lbl = lv_label_create(ota_modal_box);
+    lv_obj_add_style(title_lbl, &style_title_hebrew, LV_PART_MAIN);
+    lv_label_set_text(title_lbl, "עדכון קושחה OTA");
+    lv_obj_set_width(title_lbl, 250);
+    lv_obj_set_style_text_align(title_lbl, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
+    lv_obj_set_style_text_font(title_lbl, &lv_font_hebrew_24, LV_PART_MAIN);
+    lv_obj_align(title_lbl, LV_ALIGN_TOP_MID, 0, 5);
+
+    // 3. Status Message Label
+    ota_status_lbl = lv_label_create(ota_modal_box);
+    lv_label_set_text(ota_status_lbl, "מתחבר ל-Wi-Fi...");
+    lv_obj_set_width(ota_status_lbl, 250);
+    lv_label_set_long_mode(ota_status_lbl, LV_LABEL_LONG_WRAP);
+    lv_obj_set_style_text_font(ota_status_lbl, &lv_font_hebrew_16, LV_PART_MAIN);
+    lv_obj_set_style_text_color(ota_status_lbl, lv_color_hex(0xE2E8F0), LV_PART_MAIN);
+    lv_obj_set_style_text_align(ota_status_lbl, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
+    lv_obj_set_style_base_dir(ota_status_lbl, LV_BASE_DIR_RTL, LV_PART_MAIN);
+    lv_obj_align(ota_status_lbl, LV_ALIGN_TOP_MID, 0, 55);
+
+    // 4. Progress Bar
+    ota_progress_bar = lv_bar_create(ota_modal_box);
+    lv_obj_set_size(ota_progress_bar, 240, 18);
+    lv_obj_align(ota_progress_bar, LV_ALIGN_CENTER, 0, 15);
+    lv_bar_set_range(ota_progress_bar, 0, 100);
+    lv_bar_set_value(ota_progress_bar, 0, LV_ANIM_OFF);
+    lv_obj_set_style_bg_color(ota_progress_bar, lv_color_hex(0x1E293B), LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(ota_progress_bar, LV_OPA_COVER, LV_PART_MAIN);
+    lv_obj_set_style_bg_color(ota_progress_bar, lv_color_hex(0x38BDF8), LV_PART_INDICATOR);
+    lv_obj_set_style_bg_grad_color(ota_progress_bar, lv_color_hex(0x0284C7), LV_PART_INDICATOR);
+    lv_obj_set_style_bg_grad_dir(ota_progress_bar, LV_GRAD_DIR_HOR, LV_PART_INDICATOR);
+    lv_obj_set_style_radius(ota_progress_bar, 9, LV_PART_MAIN);
+    lv_obj_set_style_radius(ota_progress_bar, 9, LV_PART_INDICATOR);
+
+    // 5. Percent Label
+    ota_pct_lbl = lv_label_create(ota_modal_box);
+    lv_label_set_text(ota_pct_lbl, "0%");
+    lv_obj_set_style_text_font(ota_pct_lbl, &lv_font_hebrew_16, LV_PART_MAIN);
+    lv_obj_set_style_text_color(ota_pct_lbl, lv_color_hex(0x38BDF8), LV_PART_MAIN);
+    lv_obj_align(ota_pct_lbl, LV_ALIGN_CENTER, 0, 42);
+
+    // 6. Close / Cancel Button
+    ota_close_btn = lv_button_create(ota_modal_box);
+    lv_obj_set_size(ota_close_btn, 110, 48);
+    lv_obj_align(ota_close_btn, LV_ALIGN_BOTTOM_MID, 0, -5);
+    lv_obj_set_style_bg_color(ota_close_btn, lv_color_hex(0x475569), LV_PART_MAIN);
+    lv_obj_set_style_radius(ota_close_btn, 12, LV_PART_MAIN);
+    lv_obj_add_event_cb(ota_close_btn, on_ota_close_clicked, LV_EVENT_CLICKED, NULL);
+
+    lv_obj_t *close_lbl = lv_label_create(ota_close_btn);
+    lv_label_set_text(close_lbl, "סגור");
+    lv_obj_set_style_text_font(close_lbl, &lv_font_hebrew_16, LV_PART_MAIN);
+    lv_obj_set_style_text_color(close_lbl, lv_color_hex(0xFFFFFF), LV_PART_MAIN);
+    lv_obj_center(close_lbl);
+
+    // Initially hide close button while starting
+    lv_obj_add_flag(ota_close_btn, LV_OBJ_FLAG_HIDDEN);
+
+    // 7. Start LVGL GUI timer to update progress every 150ms
+    ota_update_timer = lv_timer_create(ota_ui_timer_cb, 150, NULL);
+
+    Serial.println("[UI] Launching OTA update sequence...");
+    ota_start_async_update(DEFAULT_OTA_FIRMWARE_URL);
 }
 
 /* ========================================================================== */
@@ -588,7 +708,7 @@ void ui_screen_dashboard_init(lv_obj_t *scr) {
         // Title
         lv_obj_t *title_lbl = lv_label_create(card);
         char title_buf[64];
-        snprintf(title_buf, sizeof(title_buf), "%s · %u שאלות", titles[i],
+        snprintf(title_buf, sizeof(title_buf), "%s - %u שאלות", titles[i],
                  (unsigned)quiz_get_question_count(current_profile, i));
         lv_label_set_text(title_lbl, title_buf);
         lv_obj_set_style_text_font(title_lbl, &lv_font_hebrew_16, LV_PART_MAIN);
@@ -645,6 +765,17 @@ void ui_screen_splash_init(lv_obj_t *scr) {
 
 void sm_load_screen(ScreenID_t screen_id) {
     Serial.printf("[SM] Loading screen ID: %d...\n", (int)screen_id);
+
+    // Clean up active OTA timer/modal references if leaving the dashboard
+    if (ota_update_timer) {
+        lv_timer_delete(ota_update_timer);
+        ota_update_timer = NULL;
+    }
+    ota_modal_box = NULL;
+    ota_status_lbl = NULL;
+    ota_pct_lbl = NULL;
+    ota_progress_bar = NULL;
+    ota_close_btn = NULL;
 
     // 1. Create fresh screen object in PSRAM
     lv_obj_t *new_scr = lv_obj_create(NULL);

@@ -17,16 +17,23 @@
 
 static OtaStatus_t current_status = OTA_STATUS_IDLE;
 static uint8_t progress_pct = 0;
+static size_t bytes_downloaded = 0;
+static size_t total_firmware_bytes = 0;
 static TaskHandle_t ota_task_handle = NULL;
 
 bool ota_manager_init(void) {
     current_status = OTA_STATUS_IDLE;
     progress_pct = 0;
+    bytes_downloaded = 0;
+    total_firmware_bytes = 0;
     
     // Set Wi-Fi to Station mode
     WiFi.mode(WIFI_STA);
     WiFi.setAutoReconnect(true);
-    if (WiFi.SSID().length() > 0) {
+    if (DEFAULT_WIFI_SSID[0]) {
+        WiFi.begin(DEFAULT_WIFI_SSID, DEFAULT_WIFI_PASS);
+        Serial.println("[OTA] Connecting to the locally configured Wi-Fi network in background.");
+    } else if (WiFi.SSID().length() > 0) {
         WiFi.begin();  // Reuse credentials saved by the one-time captive portal.
         Serial.println("[OTA] Connecting to the saved Wi-Fi network in background.");
     } else {
@@ -63,6 +70,7 @@ bool ota_wifi_connect(const char *ssid, const char *pass, uint32_t timeout_ms) {
 
     if (WiFi.status() != WL_CONNECTED && !target_ssid[0]) {
         Serial.println("[OTA] No saved network. Starting captive portal Ahava-Setup...");
+        current_status = OTA_STATUS_PORTAL_ACTIVE;
         WiFiManager manager;
         manager.setConfigPortalTimeout(180);
         manager.setConnectTimeout(20);
@@ -104,6 +112,8 @@ bool ota_perform_update(const char *url) {
 
     current_status = OTA_STATUS_DOWNLOADING;
     progress_pct = 0;
+    bytes_downloaded = 0;
+    total_firmware_bytes = 0;
     Serial.printf("[OTA] Starting HTTPS OTA update from: %s\n", target_url);
 
     // 2. Configure HTTPS with the ESP certificate bundle and hostname checks.
@@ -131,6 +141,7 @@ bool ota_perform_update(const char *url) {
     }
 
     int image_size = esp_https_ota_get_image_size(https_ota_handle);
+    total_firmware_bytes = (image_size > 0) ? (size_t)image_size : 0;
     Serial.printf("[OTA] Total firmware binary size: %d bytes\n", image_size);
 
     // 3. Download & Flash loop
@@ -141,6 +152,7 @@ bool ota_perform_update(const char *url) {
         }
 
         int read_len = esp_https_ota_get_image_len_read(https_ota_handle);
+        bytes_downloaded = (read_len > 0) ? (size_t)read_len : 0;
         if (image_size > 0) {
             progress_pct = (uint8_t)((read_len * 100) / image_size);
         }
@@ -207,6 +219,42 @@ OtaStatus_t ota_get_status(void) {
     return current_status;
 }
 
+const char* ota_get_status_message(void) {
+    switch (current_status) {
+        case OTA_STATUS_IDLE:
+            return "מוכן לעדכון קושחה";
+        case OTA_STATUS_CONNECTING_WIFI:
+            return "מתחבר לרשת ה-Wi-Fi...";
+        case OTA_STATUS_PORTAL_ACTIVE:
+            return "נקודת הגדרות פעילה:\nהתחברו ל-Ahava-Setup בדפדפן";
+        case OTA_STATUS_DOWNLOADING:
+            return "מוריד ומתקין קושחה חדשה...";
+        case OTA_STATUS_SUCCESS:
+            return "העדכון הושלם! המכשיר מאתחל...";
+        case OTA_STATUS_FAILED:
+            return "העדכון נכשל. בדקו את הרשת.";
+        default:
+            return "";
+    }
+}
+
 uint8_t ota_get_progress_pct(void) {
     return progress_pct;
+}
+
+size_t ota_get_bytes_read(void) {
+    return bytes_downloaded;
+}
+
+size_t ota_get_total_bytes(void) {
+    return total_firmware_bytes;
+}
+
+void ota_reset_status(void) {
+    if (ota_task_handle == NULL) {
+        current_status = OTA_STATUS_IDLE;
+        progress_pct = 0;
+        bytes_downloaded = 0;
+        total_firmware_bytes = 0;
+    }
 }
