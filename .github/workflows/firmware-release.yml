@@ -3,13 +3,15 @@ name: Build and publish firmware
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
   contents: write
 
 concurrency:
-  group: firmware-release
+  group: firmware-release-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -34,6 +36,7 @@ jobs:
           sha256sum .pio/build/spotpear-esp32s3-max35/firmware.bin
 
       - name: Replace latest OTA release
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -45,6 +48,7 @@ jobs:
             --latest
 
       - name: Publish direct OTA artifact
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
