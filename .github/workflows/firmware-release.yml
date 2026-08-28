@@ -43,3 +43,18 @@ jobs:
             --title "Latest ESP32 firmware" \
             --notes "Automated firmware build from commit $GITHUB_SHA" \
             --latest
+
+      - name: Publish direct OTA artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          publish_dir="$(mktemp -d)"
+          cp .pio/build/spotpear-esp32s3-max35/firmware.bin "$publish_dir/firmware.bin"
+          cd "$publish_dir"
+          git init
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b ota
+          git add firmware.bin
+          git commit -m "Publish firmware from $GITHUB_SHA"
+          git push --force "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" ota

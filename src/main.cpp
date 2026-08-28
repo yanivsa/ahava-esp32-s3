@@ -122,6 +122,11 @@ void setup() {
         0 // Core 0 (leaving Core 1 dedicated to GUI)
     );
 
+    #if defined(OTA_AUTOTEST_ON_BOOT) && OTA_AUTOTEST_ON_BOOT
+        Serial.println("[OTA TEST] Starting one-time automatic OTA test.");
+        ota_start_async_update(DEFAULT_OTA_FIRMWARE_URL);
+    #endif
+
     Serial.println("[SYS] Boot complete. FreeRTOS Core 1 handling GUI rendering.");
 }
 

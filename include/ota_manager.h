@@ -20,7 +20,7 @@ extern "C" {
 #define DEFAULT_WIFI_SSID       ""
 #define DEFAULT_WIFI_PASS       ""
 #endif
-#define DEFAULT_OTA_FIRMWARE_URL "https://github.com/yanivsa/ahava-esp32-s3/releases/latest/download/firmware.bin"
+#define DEFAULT_OTA_FIRMWARE_URL "https://raw.githubusercontent.com/yanivsa/ahava-esp32-s3/ota/firmware.bin"
 
 typedef enum {
     OTA_STATUS_IDLE = 0,
