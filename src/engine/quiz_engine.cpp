@@ -41,7 +41,7 @@ static void hint_close_clicked(lv_event_t *e) {
     if (lv_event_get_code(e) != LV_EVENT_CLICKED) return;
     audio_play_click();
     lv_obj_t *mbox = static_cast<lv_obj_t *>(lv_event_get_user_data(e));
-    if (mbox) lv_obj_delete(mbox);
+    if (mbox) lv_msgbox_close(mbox);
 }
 
 static void show_hint(const Question_t *q) {
@@ -49,7 +49,10 @@ static void show_hint(const Question_t *q) {
         ? q->hint
         : "נסה שוב. חפש את הפרט המדויק שמבדיל בין האפשרויות.";
 
-    lv_obj_t *mbox = lv_msgbox_create(lv_screen_active());
+    /* parent=NULL makes LVGL create a full-screen backdrop. This prevents a
+       second answer from being tapped underneath the hint dialog. */
+    lv_obj_t *mbox = lv_msgbox_create(NULL);
+    if (!mbox) return;
     lv_obj_set_style_base_dir(mbox, LV_BASE_DIR_RTL, LV_PART_MAIN);
     lv_obj_set_style_bg_color(mbox, lv_color_hex(COLOR_BG_CARD), LV_PART_MAIN);
     lv_obj_set_style_border_color(mbox, lv_color_hex(0xF59E0B), LV_PART_MAIN);
