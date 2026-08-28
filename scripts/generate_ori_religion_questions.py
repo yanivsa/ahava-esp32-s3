@@ -1,7 +1,9 @@
 Import("env")
 
 import json
+import random
 import re
+from collections import Counter
 from pathlib import Path
 
 project_dir = Path(env["PROJECT_DIR"])
@@ -24,6 +26,7 @@ EXPECTED_FILES = {
     "13_bein_hametzarim.json": ("בין המצרים", 15, 5135, 5149),
 }
 
+
 def cpp_string(value):
     text = str(value)
     text = text.replace("\\", "\\\\").replace('"', '\\"')
@@ -36,6 +39,13 @@ def normalize(text):
     text = text.replace("״", '"').replace("׳", "'")
     return re.sub(r"\s+", " ", text)
 
+
+# Keep answer positions balanced but non-obvious. The fixed seed makes builds
+# reproducible while avoiding a learnable A/B/C/D cycle across sequential IDs.
+answer_slots = [0] * 38 + [1] * 38 + [2] * 37 + [3] * 37
+random.Random(0xA8A8A).shuffle(answer_slots)
+answer_slot_by_id = {5000 + i: slot for i, slot in enumerate(answer_slots)}
+
 questions = []
 source_files = sorted(source_dir.glob("*.json"))
 actual_names = {p.name for p in source_files}
@@ -47,6 +57,7 @@ if actual_names != set(EXPECTED_FILES):
 seen_ids = set()
 seen_texts = set()
 rows = []
+generated_answer_positions = []
 
 for source_path in source_files:
     topic, expected_count, first_id, last_id = EXPECTED_FILES[source_path.name]
@@ -107,11 +118,18 @@ for source_path in source_files:
         if normalize(q["hint"]) == normalize(q["explanation"]):
             raise RuntimeError(f"Question {qid} hint must differ from final explanation")
 
+        correct_option = options[answer]
+        distractors = [option for idx, option in enumerate(options) if idx != answer]
+        generated_answer = answer_slot_by_id[qid]
+        generated_options = list(distractors)
+        generated_options.insert(generated_answer, correct_option)
+        generated_answer_positions.append(generated_answer)
+
         rows.append(
             "    {"
             + f"{qid}, 3, PROFILE_ORI, {cpp_string(q['text'])}, "
-            + "{" + ", ".join(cpp_string(option) for option in options) + "}, "
-            + f"{answer}, {cpp_string(q['explanation'])}, {cpp_string(q['hint'])}"
+            + "{" + ", ".join(cpp_string(option) for option in generated_options) + "}, "
+            + f"{generated_answer}, {cpp_string(q['explanation'])}, {cpp_string(q['hint'])}"
             + "}"
         )
         questions.append(q)
@@ -120,6 +138,10 @@ if len(questions) != 150:
     raise RuntimeError(f"Expected exactly 150 Ori religion questions, got {len(questions)}")
 if seen_ids != set(range(5000, 5150)):
     raise RuntimeError("Ori religion IDs must cover exactly 5000-5149")
+
+position_counts = Counter(generated_answer_positions)
+if sorted(position_counts.values()) != [37, 37, 38, 38]:
+    raise RuntimeError(f"Unbalanced generated answer positions: {dict(position_counts)}")
 
 generated = (
     "// Generated from data/questions/ori_religion/*.json. Do not edit manually.\n"
@@ -131,5 +153,6 @@ output_path.parent.mkdir(parents=True, exist_ok=True)
 output_path.write_text(generated, encoding="utf-8")
 print(
     f"QA PASS: generated {len(rows)} Ori religion questions from "
-    f"{len(source_files)} topic files -> {output_path}"
+    f"{len(source_files)} topic files; answer positions={dict(sorted(position_counts.items()))} "
+    f"-> {output_path}"
 )
