@@ -21,6 +21,41 @@ static size_t bytes_downloaded = 0;
 static size_t total_firmware_bytes = 0;
 static TaskHandle_t ota_task_handle = NULL;
 
+// ISRG Root X1, valid until 2035. Used explicitly because the Arduino ESP32
+// build does not include the optional runtime certificate bundle.
+static const char OTA_ROOT_CA[] = R"PEM(-----BEGIN CERTIFICATE-----
+MIIFazCCA1OgAwIBAgIRAIIQz7DSQONZRGPgu2OCiwAwDQYJKoZIhvcNAQELBQAw
+TzELMAkGA1UEBhMCVVMxKTAnBgNVBAoTIEludGVybmV0IFNlY3VyaXR5IFJlc2Vh
+cmNoIEdyb3VwMRUwEwYDVQQDEwxJU1JHIFJvb3QgWDEwHhcNMTUwNjA0MTEwNDM4
+WhcNMzUwNjA0MTEwNDM4WjBPMQswCQYDVQQGEwJVUzEpMCcGA1UEChMgSW50ZXJu
+ZXQgU2VjdXJpdHkgUmVzZWFyY2ggR3JvdXAxFTATBgNVBAMTDElTUkcgUm9vdCBY
+MTCCAiIwDQYJKoZIhvcNAQEBBQADggIPADCCAgoCggIBAK3oJHP0FDfzm54rVygc
+h77ct984kIxuPOZXoHj3dcKi/vVqbvYATyjb3miGbESTtrFj/RQSa78f0uoxmyF+
+0TM8ukj13Xnfs7j/EvEhmkvBioZxaUpmZmyPfjxwv60pIgbz5MDmgK7iS4+3mX6U
+A5/TR5d8mUgjU+g4rk8Kb4Mu0UlXjIB0ttov0DiNewNwIRt18jA8+o+u3dpjq+sW
+T8KOEUt+zwvo/7V3LvSye0rgTBIlDHCNAymg4VMk7BPZ7hm/ELNKjD+Jo2FR3qyH
+B5T0Y3HsLuJvW5iB4YlcNHlsdu87kGJ55tukmi8mxdAQ4Q7e2RCOFvu396j3x+UC
+B5iPNgiV5+I3lg02dZ77DnKxHZu8A/lJBdiB3QW0KtZB6awBdpUKD9jf1b0SHzUv
+KBds0pjBqAlkd25HN7rOrFleaJ1/ctaJxQZBKT5ZPt0m9STJEadao0xAH0ahmbWn
+OlFuhjuefXKnEgV4We0+UXgVCwOPjdAvBbI+e0ocS3MFEvzG6uBQE3xDk3SzynTn
+jh8BCNAw1FtxNrQHusEwMFxIt4I7mKZ9YIqioymCzLq9gwQbooMDQaHWBfEbwrbw
+qHyGO0aoSCqI3Haadr8faqU9GY/rOPNk3sgrDQoo//fb4hVC1CLQJ13hef4Y53CI
+rU7m2Ys6xt0nUW7/vGT1M0NPAgMBAAGjQjBAMA4GA1UdDwEB/wQEAwIBBjAPBgNV
+HRMBAf8EBTADAQH/MB0GA1UdDgQWBBR5tFnme7bl5AFzgAiIyBpY9umbbjANBgkq
+hkiG9w0BAQsFAAOCAgEAVR9YqbyyqFDQDLHYGmkgJykIrGF1XIpu+ILlaS/V9lZL
+ubhzEFnTIZd+50xx+7LSYK05qAvqFyFWhfFQDlnrzuBZ6brJFe+GnY+EgPbk6ZGQ
+3BebYhtF8GaV0nxvwuo77x/Py9auJ/GpsMiu/X1+mvoiBOv/2X/qkSsisRcOj/KK
+NFtY2PwByVS5uCbMiogziUwthDyC3+6WVwW6LLv3xLfHTjuCvjHIInNzktHCgKQ5
+ORAzI4JMPJ+GslWYHb4phowim57iaztXOoJwTdwJx4nLCgdNbOhdjsnvzqvHu7Ur
+TkXWStAmzOVyyghqpZXjFaH3pO3JLF+l+/+sKAIuvtd7u+Nxe5AW0wdeRlN8NwdC
+jNPElpzVmbUq4JUagEiuTDkHzsxHpFKVK7q4+63SM1N95R1NbdWhscdCb+ZAJzVc
+oyi3B43njTOQ5yOf+1CceWxG1bQVs5ZufpsMljq4Ui0/1lvh+wjChP4kqKOJ2qxq
+4RgqsahDYVvTH9w7jXbyLeiNdd8XM2w9U/t7y0Ff/9yi0GE44Za4rF2LN9d11TPA
+mRGunUHBcnWEvgJBQl9nJEiU0Zsnvgc/ubhPgXRR4Xq37Z0j4r7g1SgEEzwxA57d
+emyPxgcYxn/eR44/KJ4EBs+lVDR3veyJm+kXQ99b21/+jh5Xos1AnX5iItreGCc=
+-----END CERTIFICATE-----
+)PEM";
+
 bool ota_manager_init(void) {
     current_status = OTA_STATUS_IDLE;
     progress_pct = 0;
@@ -31,6 +66,7 @@ bool ota_manager_init(void) {
     WiFi.mode(WIFI_STA);
     WiFi.setAutoReconnect(true);
     if (DEFAULT_WIFI_SSID[0]) {
+        WiFi.persistent(true);
         WiFi.begin(DEFAULT_WIFI_SSID, DEFAULT_WIFI_PASS);
         Serial.println("[OTA] Connecting to the locally configured Wi-Fi network in background.");
     } else if (WiFi.SSID().length() > 0) {
@@ -119,11 +155,11 @@ bool ota_perform_update(const char *url) {
     // 2. Configure HTTPS with the ESP certificate bundle and hostname checks.
     esp_http_client_config_t http_config = {};
     http_config.url = target_url;
-    http_config.cert_pem = NULL;
+    http_config.cert_pem = OTA_ROOT_CA;
     // Never weaken TLS hostname validation. OTA stays disabled until a trusted
     // endpoint and its CA certificate are provisioned for this device.
     http_config.skip_cert_common_name_check = false;
-    http_config.crt_bundle_attach = arduino_esp_crt_bundle_attach;
+    http_config.crt_bundle_attach = NULL;
     http_config.timeout_ms = 20000;
     http_config.keep_alive_enable = true;
     http_config.max_redirection_count = 5;
@@ -145,6 +181,7 @@ bool ota_perform_update(const char *url) {
     Serial.printf("[OTA] Total firmware binary size: %d bytes\n", image_size);
 
     // 3. Download & Flash loop
+    uint8_t last_reported_pct = 255;
     while (1) {
         err = esp_https_ota_perform(https_ota_handle);
         if (err != ESP_ERR_HTTPS_OTA_IN_PROGRESS) {
@@ -156,8 +193,11 @@ bool ota_perform_update(const char *url) {
         if (image_size > 0) {
             progress_pct = (uint8_t)((read_len * 100) / image_size);
         }
-        Serial.printf("[OTA] Flash progress: %d bytes (%u%%)\n", read_len, progress_pct);
-        vTaskDelay(pdMS_TO_TICKS(50));
+        if (progress_pct != last_reported_pct) {
+            Serial.printf("[OTA] Flash progress: %d bytes (%u%%)\n", read_len, progress_pct);
+            last_reported_pct = progress_pct;
+        }
+        taskYIELD();
     }
 
     if (err != ESP_OK) {
