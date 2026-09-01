@@ -95,6 +95,11 @@ void ota_reset_status(void);
  */
 bool ota_is_wifi_connected(void);
 
+/**
+ * @brief Disconnect Wi-Fi and power down the radio to save battery.
+ */
+void ota_wifi_disconnect(void);
+
 #ifdef __cplusplus
 }
 #endif

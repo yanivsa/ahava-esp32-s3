@@ -295,11 +295,13 @@ static void on_answer_clicked(lv_event_t *e) {
                   clicked_idx, current_quiz_question->correct_idx,
                   is_correct ? "CORRECT" : "WRONG");
 
-    // 1. Play Non-Blocking Audio Feedback
+    // 1. Play Non-Blocking Audio & Hebrew Voice Feedback
     if (is_correct) {
         audio_play_success();
+        audio_play_voice_success();
     } else {
         audio_play_fail();
+        audio_play_voice_retry();
     }
 
     // 2. Disable all 4 buttons to prevent double answers
@@ -387,6 +389,13 @@ static void on_answer_clicked(lv_event_t *e) {
     }
 }
 
+static void on_question_card_clicked(lv_event_t *e) {
+    if (lv_event_get_code(e) == LV_EVENT_CLICKED && current_quiz_question) {
+        audio_play_click();
+        audio_play_voice_prompt(current_quiz_question->text);
+    }
+}
+
 /* ========================================================================== */
 /*                         SCREEN BUILDER: QUIZ SCREEN                        */
 /* ========================================================================== */
@@ -396,6 +405,11 @@ void ui_screen_quiz_init(lv_obj_t *scr) {
 
     // 1. Fetch Question from Static Engine
     current_quiz_question = quiz_get_next_question(current_profile, current_subject_id);
+
+    // Auto-read question aloud for Ayala (Age 3) or if spoken clip exists
+    if (current_quiz_question && current_profile == PROFILE_AYALA) {
+        audio_play_voice_prompt(current_quiz_question->text);
+    }
 
     /* ---------------------------------------------------------------------- */
     /* 2. Top HUD Bar                                                         */
@@ -435,7 +449,7 @@ void ui_screen_quiz_init(lv_obj_t *scr) {
     lv_obj_center(back_lbl);
 
     /* ---------------------------------------------------------------------- */
-    /* 3. Question Prompt Card (Top Half)                                     */
+    /* 3. Question Prompt Card (Top Half) - Tap to Hear Speech                 */
     /* ---------------------------------------------------------------------- */
     lv_obj_t *question_card = lv_obj_create(scr);
     theme_apply_card(question_card);
@@ -443,13 +457,15 @@ void ui_screen_quiz_init(lv_obj_t *scr) {
     lv_obj_align(question_card, LV_ALIGN_TOP_MID, 0, 60);
     lv_obj_set_style_border_color(question_card, lv_color_hex(p->color_accent), LV_PART_MAIN);
     lv_obj_set_style_border_width(question_card, 2, LV_PART_MAIN);
+    lv_obj_add_flag(question_card, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_event_cb(question_card, on_question_card_clicked, LV_EVENT_CLICKED, NULL);
     lv_obj_remove_flag(question_card, LV_OBJ_FLAG_SCROLLABLE);
 
     lv_obj_t *q_label = lv_label_create(question_card);
     lv_label_set_text(q_label, current_quiz_question ? current_quiz_question->text : "טוען שאלה...");
     lv_obj_set_width(q_label, 250);
     lv_label_set_long_mode(q_label, LV_LABEL_LONG_WRAP);
-    lv_obj_set_style_text_font(q_label, &lv_font_hebrew_16, LV_PART_MAIN);
+    lv_obj_set_style_text_font(q_label, (current_profile == PROFILE_AYALA) ? &lv_font_hebrew_24 : &lv_font_hebrew_16, LV_PART_MAIN);
     lv_obj_set_style_text_color(q_label, lv_color_hex(0xFFFFFF), LV_PART_MAIN);
     lv_obj_set_style_text_align(q_label, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
     lv_obj_set_style_base_dir(q_label, LV_BASE_DIR_RTL, LV_PART_MAIN);
@@ -481,9 +497,9 @@ void ui_screen_quiz_init(lv_obj_t *scr) {
 
         lv_obj_t *btn_lbl = lv_label_create(btn);
         lv_label_set_text(btn_lbl, current_quiz_question ? current_quiz_question->answers[i] : "");
-        lv_obj_set_width(btn_lbl, 116);
+        lv_obj_set_width(btn_lbl, 124);
         lv_label_set_long_mode(btn_lbl, LV_LABEL_LONG_WRAP);
-        lv_obj_set_style_text_font(btn_lbl, &lv_font_hebrew_16, LV_PART_MAIN);
+        lv_obj_set_style_text_font(btn_lbl, (current_profile == PROFILE_AYALA) ? &lv_font_hebrew_24 : &lv_font_hebrew_16, LV_PART_MAIN);
         lv_obj_set_style_text_color(btn_lbl, lv_color_hex(0xFFFFFF), LV_PART_MAIN);
         lv_obj_set_style_text_align(btn_lbl, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
         lv_obj_set_style_base_dir(btn_lbl, LV_BASE_DIR_RTL, LV_PART_MAIN);
@@ -603,8 +619,7 @@ void ui_screen_dashboard_init(lv_obj_t *scr) {
     const ProfileInfo_t *p = sm_get_profile_info(current_profile);
 
     // Fetch actual persistent values from NVS
-    uint32_t current_coins = player_data_get_coins(current_profile);
-    uint32_t current_xp = player_data_get_xp(current_profile);
+    uint32_t questions_today = player_data_get_questions_today(current_profile);
 
     /* ---------------------------------------------------------------------- */
     /* 1. HUD (Heads-Up Display) Top Bar                                      */
@@ -622,30 +637,26 @@ void ui_screen_dashboard_init(lv_obj_t *scr) {
     lv_obj_set_flex_align(hud, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     lv_obj_remove_flag(hud, LV_OBJ_FLAG_SCROLLABLE);
 
-    // Energy
-    lv_obj_t *lbl_energy = lv_label_create(hud);
-    lv_obj_add_style(lbl_energy, &style_subtitle_hebrew, LV_PART_MAIN);
-    lv_label_set_text(lbl_energy, "5/5");
-    lv_obj_set_style_text_font(lbl_energy, &lv_font_hebrew_16, LV_PART_MAIN);
+    // Profile Name on Right
+    lv_obj_t *lbl_pname = lv_label_create(hud);
+    char pname_buf[48];
+    snprintf(pname_buf, sizeof(pname_buf), "%s %s", p->name_hebrew, p->badge_symbol);
+    lv_label_set_text(lbl_pname, pname_buf);
+    lv_obj_set_style_text_font(lbl_pname, &lv_font_hebrew_24, LV_PART_MAIN);
+    lv_obj_set_style_text_color(lbl_pname, lv_color_hex(p->color_accent), LV_PART_MAIN);
+    lv_obj_set_style_base_dir(lbl_pname, LV_BASE_DIR_RTL, LV_PART_MAIN);
 
-    // Coins 🪙 (Dynamically loaded from NVS)
-    lv_obj_t *lbl_coins = lv_label_create(hud);
-    lv_obj_add_style(lbl_coins, &style_subtitle_hebrew, LV_PART_MAIN);
-    char coins_buf[32];
-    snprintf(coins_buf, sizeof(coins_buf), "%u מטבעות", (unsigned int)current_coins);
-    lv_label_set_text(lbl_coins, coins_buf);
-    lv_obj_set_style_text_font(lbl_coins, &lv_font_hebrew_16, LV_PART_MAIN);
-
-    // XP (Dynamically loaded from NVS)
-    lv_obj_t *lbl_xp = lv_label_create(hud);
-    lv_obj_add_style(lbl_xp, &style_subtitle_hebrew, LV_PART_MAIN);
-    char xp_buf[32];
-    snprintf(xp_buf, sizeof(xp_buf), "%u XP", (unsigned int)current_xp);
-    lv_label_set_text(lbl_xp, xp_buf);
-    lv_obj_set_style_text_font(lbl_xp, &lv_font_hebrew_16, LV_PART_MAIN);
+    // Daily Questions Count Center: "שאלות היום: X"
+    lv_obj_t *lbl_today = lv_label_create(hud);
+    char today_buf[48];
+    snprintf(today_buf, sizeof(today_buf), "שאלות היום: %u", (unsigned int)questions_today);
+    lv_label_set_text(lbl_today, today_buf);
+    lv_obj_set_style_text_font(lbl_today, &lv_font_hebrew_16, LV_PART_MAIN);
+    lv_obj_set_style_text_color(lbl_today, lv_color_hex(0x38BDF8), LV_PART_MAIN); // Radiant Sky Blue
+    lv_obj_set_style_base_dir(lbl_today, LV_BASE_DIR_RTL, LV_PART_MAIN);
     
     #if BSP_OTA_ENABLED
-    // OTA button is exposed only when a trusted endpoint is provisioned.
+    // OTA button
     lv_obj_t *ota_btn = lv_button_create(hud);
     lv_obj_set_size(ota_btn, 42, 35);
     lv_obj_set_style_bg_color(ota_btn, lv_color_hex(0x0284C7), LV_PART_MAIN); // Sky Blue
@@ -681,21 +692,31 @@ void ui_screen_dashboard_init(lv_obj_t *scr) {
     lv_obj_set_flex_flow(scroll, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(scroll, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
 
-    /* Generate Subjects Based on Profile */
+    /* Generate Age-Tailored Subjects Based on Active Profile */
     const char* titles[4];
     const char* emojis[4];
-    int num_subjects = 0;
 
-    titles[0] = "חשבון"; emojis[0] = "M";
-    titles[1] = "עברית"; emojis[1] = "H";
-    titles[2] = "אנגלית"; emojis[2] = "EN";
-    titles[3] = "יהדות"; emojis[3] = "J";
-    num_subjects = 4;
+    if (current_profile == PROFILE_AYALA) {
+        titles[0] = "צורות ומספרים"; emojis[0] = "🔴";
+        titles[1] = "חיות וסביבה"; emojis[1] = "🐶";
+        titles[2] = "אנגלית לקטנטנים"; emojis[2] = "🍎";
+        titles[3] = "שבת וחגים"; emojis[3] = "🕯️";
+    } else if (current_profile == PROFILE_ETHAN) {
+        titles[0] = "חשבון וכפל"; emojis[0] = "➗";
+        titles[1] = "לשון ועברית"; emojis[1] = "📖";
+        titles[2] = "אנגלית יסודי"; emojis[2] = "🔤";
+        titles[3] = "מסורת ישראל"; emojis[3] = "🕍";
+    } else {
+        titles[0] = "מתמטיקה"; emojis[0] = "📐";
+        titles[1] = "הבנת הנקרא ולשון"; emojis[1] = "📚";
+        titles[2] = "אנגלית מתקדמת"; emojis[2] = "🌍";
+        titles[3] = "ישיבת יגל והלכה"; emojis[3] = "📜";
+    }
 
-    for (int i = 0; i < num_subjects; i++) {
+    for (int i = 0; i < 4; i++) {
         lv_obj_t *card = lv_obj_create(scroll);
         theme_apply_card(card);
-        lv_obj_set_size(card, 290, 110);
+        lv_obj_set_size(card, 290, 100);
         lv_obj_set_style_border_color(card, lv_color_hex(p->color_accent), LV_PART_MAIN);
         lv_obj_remove_flag(card, LV_OBJ_FLAG_SCROLLABLE);
 
@@ -707,11 +728,8 @@ void ui_screen_dashboard_init(lv_obj_t *scr) {
 
         // Title
         lv_obj_t *title_lbl = lv_label_create(card);
-        char title_buf[64];
-        snprintf(title_buf, sizeof(title_buf), "%s - %u שאלות", titles[i],
-                 (unsigned)quiz_get_question_count(current_profile, i));
-        lv_label_set_text(title_lbl, title_buf);
-        lv_obj_set_style_text_font(title_lbl, &lv_font_hebrew_16, LV_PART_MAIN);
+        lv_label_set_text(title_lbl, titles[i]);
+        lv_obj_set_style_text_font(title_lbl, &lv_font_hebrew_24, LV_PART_MAIN);
         lv_obj_set_style_text_color(title_lbl, lv_color_hex(0xFFFFFF), LV_PART_MAIN);
         lv_obj_set_style_base_dir(title_lbl, LV_BASE_DIR_RTL, LV_PART_MAIN);
         lv_obj_align(title_lbl, LV_ALIGN_TOP_RIGHT, 0, 0);
@@ -719,7 +737,7 @@ void ui_screen_dashboard_init(lv_obj_t *scr) {
         // Play Button
         lv_obj_t *play_btn = lv_button_create(card);
         theme_apply_btn_main(play_btn);
-        lv_obj_set_size(play_btn, 120, 45);
+        lv_obj_set_size(play_btn, 120, 40);
         lv_obj_align(play_btn, LV_ALIGN_BOTTOM_MID, 0, 0);
         lv_obj_add_event_cb(play_btn, on_play_subject_clicked, LV_EVENT_CLICKED, (void*)(uintptr_t)i);
 

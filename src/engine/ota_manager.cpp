@@ -62,22 +62,19 @@ bool ota_manager_init(void) {
     bytes_downloaded = 0;
     total_firmware_bytes = 0;
     
-    // Set Wi-Fi to Station mode
+    // Set Wi-Fi to Station mode with auto-reconnect
     WiFi.mode(WIFI_STA);
     WiFi.setAutoReconnect(true);
     if (DEFAULT_WIFI_SSID[0]) {
         WiFi.persistent(true);
         WiFi.begin(DEFAULT_WIFI_SSID, DEFAULT_WIFI_PASS);
-        Serial.println("[OTA] Connecting to the locally configured Wi-Fi network in background.");
+        Serial.println("[OTA] Connecting to configured Wi-Fi network in background.");
     } else {
-        // WiFi.SSID() is empty until the station is started on this Arduino core,
-        // even when credentials are present in NVS. Begin first and let ESP-IDF
-        // restore them; if none exist the OTA button will open provisioning.
         WiFi.begin();
         Serial.println("[OTA] Restoring saved Wi-Fi credentials in background.");
     }
     
-    Serial.println("[OTA] Wi-Fi & OTA Manager initialized (Station mode).");
+    Serial.println("[OTA] Wi-Fi & OTA Manager initialized (Station mode active).");
     return true;
 }
 
@@ -85,11 +82,21 @@ bool ota_is_wifi_connected(void) {
     return (WiFi.status() == WL_CONNECTED);
 }
 
+void ota_wifi_disconnect(void) {
+    if (WiFi.getMode() != WIFI_OFF) {
+        WiFi.disconnect(true);
+        WiFi.mode(WIFI_OFF);
+        Serial.println("[OTA] Wi-Fi radio powered down (WIFI_OFF) for battery preservation.");
+    }
+}
+
 bool ota_wifi_connect(const char *ssid, const char *pass, uint32_t timeout_ms) {
     const char *target_ssid = ssid ? ssid : DEFAULT_WIFI_SSID;
     const char *target_pass = pass ? pass : DEFAULT_WIFI_PASS;
 
     current_status = OTA_STATUS_CONNECTING_WIFI;
+    WiFi.mode(WIFI_STA);
+    WiFi.setAutoReconnect(true);
     if (target_ssid[0]) {
         Serial.printf("[OTA] Connecting to Wi-Fi SSID: %s ...\n", target_ssid);
         WiFi.begin(target_ssid, target_pass);
@@ -124,6 +131,7 @@ bool ota_wifi_connect(const char *ssid, const char *pass, uint32_t timeout_ms) {
     } else {
         Serial.println("[OTA] Wi-Fi connection timed out!");
         current_status = OTA_STATUS_FAILED;
+        ota_wifi_disconnect();
         return false;
     }
 }
@@ -205,6 +213,7 @@ bool ota_perform_update(const char *url) {
         Serial.printf("[OTA] ERROR: esp_https_ota_perform failed (0x%x)\n", err);
         esp_https_ota_abort(https_ota_handle);
         current_status = OTA_STATUS_FAILED;
+        ota_wifi_disconnect();
         return false;
     }
 
@@ -212,6 +221,7 @@ bool ota_perform_update(const char *url) {
     if (finish_err != ESP_OK) {
         Serial.printf("[OTA] ERROR: esp_https_ota_finish failed (0x%x)\n", finish_err);
         current_status = OTA_STATUS_FAILED;
+        ota_wifi_disconnect();
         return false;
     }
 

@@ -49,6 +49,20 @@ uint32_t player_data_get_xp(WizardProfile_t profile);
 void player_data_add_xp(WizardProfile_t profile, uint32_t amount);
 
 /**
+ * @brief Get total questions answered today by a specific child profile.
+ * @param profile Target profile.
+ * @return Number of questions answered today.
+ */
+uint32_t player_data_get_questions_today(WizardProfile_t profile);
+
+/**
+ * @brief Increment questions answered today for a specific child profile.
+ * @param profile Target profile.
+ * @return Updated count of questions answered today.
+ */
+uint32_t player_data_increment_questions_today(WizardProfile_t profile);
+
+/**
  * @brief Reset progress for all child profiles (for debugging/testing).
  */
 void player_data_reset_all(void);

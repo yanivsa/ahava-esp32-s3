@@ -80,9 +80,11 @@ void hal_display_flush_cb(lv_display_t *disp, const lv_area_t *area, uint8_t *px
 }
 
 void hal_display_set_backlight(uint8_t duty) {
+    // MAX35 uses an active-low PMOS switch: 255 brightness -> 0 PWM duty (full on), 0 brightness -> 255 (off)
+    uint8_t hw_duty = (uint8_t)(255 - duty);
     #if ESP_ARDUINO_VERSION_MAJOR >= 3
-        ledcWrite(BSP_LCD_BL_PIN, duty);
+        ledcWrite(BSP_LCD_BL_PIN, hw_duty);
     #else
-        ledcWrite(0, duty);
+        ledcWrite(0, hw_duty);
     #endif
 }

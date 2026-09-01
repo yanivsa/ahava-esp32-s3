@@ -34,6 +34,27 @@ void audio_play_success(void);
 void audio_play_fail(void);
 
 /**
+ * @brief Play a raw 16kHz 16-bit Mono PCM speech buffer from Flash (non-blocking).
+ */
+void audio_play_pcm(const uint8_t *data, size_t size);
+
+/**
+ * @brief Play a random Hebrew praise voice clip ("כל הכבוד!", "נכון מאוד!", etc.)
+ */
+void audio_play_voice_success(void);
+
+/**
+ * @brief Play a Hebrew retry voice clip ("בוא ננסה שוב")
+ */
+void audio_play_voice_retry(void);
+
+/**
+ * @brief Play a question prompt voice clip matching the given Hebrew text (if available).
+ * @return true if a matching voice clip was found and queued, false otherwise.
+ */
+bool audio_play_voice_prompt(const char *prompt_text);
+
+/**
  * @brief Set master volume percentage (0 - 100).
  */
 void audio_set_volume(uint8_t volume_pct);

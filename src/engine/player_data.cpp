@@ -114,6 +114,28 @@ void player_data_add_xp(WizardProfile_t profile, uint32_t amount) {
     }
 }
 
+uint32_t player_data_get_questions_today(WizardProfile_t profile) {
+    if (profile <= PROFILE_NONE || profile >= PROFILE_MAX) return 0;
+    char key[16];
+    snprintf(key, sizeof(key), "qt_%d", (int)profile);
+    return nvs_read_u32_val(key, 0);
+}
+
+uint32_t player_data_increment_questions_today(WizardProfile_t profile) {
+    if (profile <= PROFILE_NONE || profile >= PROFILE_MAX) return 0;
+    char key[16];
+    snprintf(key, sizeof(key), "qt_%d", (int)profile);
+
+    uint32_t current_count = nvs_read_u32_val(key, 0);
+    uint32_t new_count = current_count + 1;
+
+    if (nvs_write_u32_val(key, new_count)) {
+        Serial.printf("[NVS] Profile %d: Answered today count -> %u 🎯\n", 
+                      (int)profile, new_count);
+    }
+    return new_count;
+}
+
 void player_data_reset_all(void) {
     nvs_handle_t handle;
     if (nvs_open(NVS_STORAGE_NAMESPACE, NVS_READWRITE, &handle) == ESP_OK) {

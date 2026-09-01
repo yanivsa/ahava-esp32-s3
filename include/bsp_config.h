@@ -65,8 +65,8 @@ extern "C" {
 #define BSP_I2S_BCLK_PIN           4    // Bit Clock (BCLK) - safe GPIO
 #define BSP_I2S_LRC_PIN            5    // Word Select / Left-Right Clock (WS/LRC)
 #define BSP_I2S_DOUT_PIN           16   // Serial Data Output (DOUT)
-#define BSP_I2S_SAMPLE_RATE        22050
-#define BSP_AUDIO_ENABLED          0    // ES8311 codec requires board-specific initialization
+#define BSP_I2S_SAMPLE_RATE        16000
+#define BSP_AUDIO_ENABLED          1    // I2S Audio synthesizer & Hebrew TTS playback
 #define BSP_OTA_ENABLED            1    // Wi-Fi is provisioned at runtime; firmware is fetched over verified HTTPS
 
 #define BSP_AUDIO_TASK_NAME        "audio_task"

@@ -5,8 +5,10 @@
 
 #include "audio_manager.h"
 #include "bsp_config.h"
+#include "voice_assets.h"
 #include <Arduino.h>
 #include <math.h>
+#include <string.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/queue.h"
@@ -16,16 +18,19 @@
 typedef enum {
     AUDIO_CMD_CLICK = 1,
     AUDIO_CMD_SUCCESS,
-    AUDIO_CMD_FAIL
+    AUDIO_CMD_FAIL,
+    AUDIO_CMD_VOICE
 } AudioCommandType_t;
 
 typedef struct {
     AudioCommandType_t type;
+    const uint8_t *pcm_data;
+    size_t pcm_size;
 } AudioMsg_t;
 
 static QueueHandle_t audio_queue = NULL;
 static TaskHandle_t audio_task_handle = NULL;
-static uint8_t master_volume = 85; // Default 85%
+static uint8_t master_volume = 25; // Gentle 25% default volume (study-friendly)
 
 /* ========================================================================== */
 /*                         SYNTHESIS & I2S PLAYBACK                           */
@@ -51,13 +56,13 @@ static void play_tone(float freq_hz, uint32_t duration_ms, float gain, bool fade
             uint32_t current_idx = samples_generated + i;
             float current_vol = volume;
 
-            // Attack envelope: 4ms
-            uint32_t attack_samples = (BSP_I2S_SAMPLE_RATE * 4) / 1000;
+            // Smooth attack envelope: 5ms
+            uint32_t attack_samples = (BSP_I2S_SAMPLE_RATE * 5) / 1000;
             if (current_idx < attack_samples) {
                 current_vol *= ((float)current_idx / (float)attack_samples);
             } else if (fade_out) {
                 float progress = (float)current_idx / (float)total_samples;
-                current_vol *= (1.0f - progress * progress);
+                current_vol *= (1.0f - progress) * (1.0f - progress);
             }
 
             int16_t sample = (int16_t)(sinf(phase) * current_vol * 32767.0f);
@@ -91,29 +96,59 @@ static void play_silence(uint32_t duration_ms) {
     }
 }
 
+static void play_pcm_stream(const uint8_t *pcm_data, size_t pcm_bytes) {
+    if (!pcm_data || pcm_bytes < 2) return;
+
+    float vol = master_volume / 100.0f;
+    const size_t CHUNK_SAMPLES = 256;
+    int16_t buffer[CHUNK_SAMPLES * 2]; // 16-bit Stereo (L, R)
+
+    const int16_t *samples = (const int16_t *)pcm_data;
+    size_t total_samples = pcm_bytes / sizeof(int16_t);
+    size_t samples_sent = 0;
+
+    while (samples_sent < total_samples) {
+        size_t to_send = total_samples - samples_sent;
+        if (to_send > CHUNK_SAMPLES) to_send = CHUNK_SAMPLES;
+
+        for (size_t i = 0; i < to_send; i++) {
+            int16_t s = samples[samples_sent + i];
+            int16_t scaled = (int16_t)(s * vol);
+            buffer[i * 2]     = scaled; // Left Channel
+            buffer[i * 2 + 1] = scaled; // Right Channel
+        }
+
+        size_t bytes_written = 0;
+        i2s_write(BSP_I2S_NUM, buffer, to_send * 2 * sizeof(int16_t), &bytes_written, portMAX_DELAY);
+        samples_sent += to_send;
+    }
+
+    play_silence(20);
+}
+
 /* ========================================================================== */
 /*                         SOUND EFFECTS COMPOSITIONS                         */
 /* ========================================================================== */
 
 static void render_sound_click(void) {
-    play_tone(1200.0f, 22, 0.7f, true);
+    // Subtle, soft micro-tick for UI touches
+    play_tone(900.0f, 15, 0.25f, true);
     play_silence(10);
 }
 
 static void render_sound_success(void) {
-    // Ascending Magical Arpeggio: C5 -> E5 -> G5 -> C6 -> G6 Chime
-    play_tone(523.25f, 65, 0.75f, true);  // C5
-    play_tone(659.25f, 65, 0.80f, true);  // E5
-    play_tone(783.99f, 65, 0.85f, true);  // G5
-    play_tone(1046.50f, 160, 0.90f, true); // C6
-    play_tone(1567.98f, 120, 0.70f, true); // G6
+    // Gentle music box / marimba chime: E5 -> A5 -> C#6 (Major chord, warm and quiet)
+    play_tone(659.25f, 60, 0.35f, true);  // E5
+    play_tone(880.00f, 65, 0.40f, true);  // A5
+    play_tone(1108.73f, 130, 0.45f, true); // C#6 (warm resolved ring)
     play_silence(20);
 }
 
 static void render_sound_fail(void) {
-    // Low Descending Buzzer
-    play_tone(180.0f, 130, 0.85f, true);
-    play_tone(130.0f, 200, 0.90f, true);
+    // Gentle, soft low woodblock tap (non-punishing, discreet)
+    play_tone(240.0f, 35, 0.30f, true);
+    play_silence(15);
+    play_tone(190.0f, 45, 0.25f, true);
     play_silence(20);
 }
 
@@ -139,6 +174,11 @@ static void audio_task_worker(void *pvParameters) {
                     break;
                 case AUDIO_CMD_FAIL:
                     render_sound_fail();
+                    break;
+                case AUDIO_CMD_VOICE:
+                    if (msg.pcm_data && msg.pcm_size > 0) {
+                        play_pcm_stream(msg.pcm_data, msg.pcm_size);
+                    }
                     break;
                 default:
                     break;
@@ -218,20 +258,55 @@ bool audio_manager_init(void) {
 
 void audio_play_click(void) {
     if (!audio_queue) return;
-    AudioMsg_t msg = { .type = AUDIO_CMD_CLICK };
+    AudioMsg_t msg = { .type = AUDIO_CMD_CLICK, .pcm_data = NULL, .pcm_size = 0 };
     xQueueSend(audio_queue, &msg, 0); // Non-blocking
 }
 
 void audio_play_success(void) {
     if (!audio_queue) return;
-    AudioMsg_t msg = { .type = AUDIO_CMD_SUCCESS };
+    AudioMsg_t msg = { .type = AUDIO_CMD_SUCCESS, .pcm_data = NULL, .pcm_size = 0 };
     xQueueSend(audio_queue, &msg, 0);
 }
 
 void audio_play_fail(void) {
     if (!audio_queue) return;
-    AudioMsg_t msg = { .type = AUDIO_CMD_FAIL };
+    AudioMsg_t msg = { .type = AUDIO_CMD_FAIL, .pcm_data = NULL, .pcm_size = 0 };
     xQueueSend(audio_queue, &msg, 0);
+}
+
+void audio_play_pcm(const uint8_t *data, size_t size) {
+    if (!audio_queue || !data || size == 0) return;
+    AudioMsg_t msg = { .type = AUDIO_CMD_VOICE, .pcm_data = data, .pcm_size = size };
+    xQueueSend(audio_queue, &msg, 0);
+}
+
+void audio_play_voice_success(void) {
+    if (!audio_queue) return;
+    // Pick a random praise clip
+    static uint32_t praise_idx = 0;
+    uint32_t idx = (praise_idx++) % VOICE_SUCCESS_COUNT;
+    audio_play_pcm(VOICE_SUCCESS_CLIPS[idx].data, VOICE_SUCCESS_CLIPS[idx].size);
+}
+
+void audio_play_voice_retry(void) {
+    if (!audio_queue) return;
+    static uint32_t retry_idx = 0;
+    uint32_t idx = (retry_idx++) % VOICE_RETRY_COUNT;
+    audio_play_pcm(VOICE_RETRY_CLIPS[idx].data, VOICE_RETRY_CLIPS[idx].size);
+}
+
+bool audio_play_voice_prompt(const char *prompt_text) {
+    if (!audio_queue || !prompt_text) return false;
+
+    // Search in the ALL_VOICE_CLIPS table
+    for (size_t i = 0; i < TOTAL_VOICE_CLIPS; i++) {
+        if (strstr(prompt_text, ALL_VOICE_CLIPS[i].prompt) != NULL ||
+            strstr(ALL_VOICE_CLIPS[i].prompt, prompt_text) != NULL) {
+            audio_play_pcm(ALL_VOICE_CLIPS[i].data, ALL_VOICE_CLIPS[i].size);
+            return true;
+        }
+    }
+    return false;
 }
 
 void audio_set_volume(uint8_t volume_pct) {
