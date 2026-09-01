@@ -143,7 +143,7 @@ static const VoiceClip_t VOICE_RETRY_CLIPS[] = {{
 #define VOICE_RETRY_COUNT 2
 
 static const VoiceClip_t ALL_VOICE_CLIPS[] = {{
-{chr(10).join(index_entries)}
+{",\n".join(index_entries)}
 }};
 #define TOTAL_VOICE_CLIPS {len(index_entries)}
 
