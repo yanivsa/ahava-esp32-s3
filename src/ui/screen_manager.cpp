@@ -12,6 +12,7 @@
 #include "hal_lvgl.h"
 #include "bsp_config.h"
 #include <Arduino.h>
+#include <WiFi.h>
 #include "esp_heap_caps.h"
 
 /* Global active child profile */
@@ -513,6 +514,13 @@ void ui_screen_quiz_init(lv_obj_t *scr) {
 /*                         SCREEN BUILDER: PROFILES                           */
 /* ========================================================================== */
 
+static void on_system_card_clicked(lv_event_t *e) {
+    if (lv_event_get_code(e) == LV_EVENT_CLICKED) {
+        audio_play_click();
+        sm_load_screen(SCREEN_SYSTEM);
+    }
+}
+
 void ui_screen_profiles_init(lv_obj_t *scr) {
     // 1. Screen Title: "מי הקוסם שמשחק עכשיו?"
     lv_obj_t *title_label = lv_label_create(scr);
@@ -520,7 +528,7 @@ void ui_screen_profiles_init(lv_obj_t *scr) {
     lv_label_set_text(title_label, "מי הקוסם שמשחק עכשיו?");
     lv_obj_set_width(title_label, 300);
     lv_obj_set_style_text_align(title_label, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
-    lv_obj_align(title_label, LV_ALIGN_TOP_MID, 0, 35);
+    lv_obj_align(title_label, LV_ALIGN_TOP_MID, 0, 20);
 
     // 2. Subtitle: "בחר את הפרופיל שלך כדי להתחיל"
     lv_obj_t *sub_label = lv_label_create(scr);
@@ -528,29 +536,29 @@ void ui_screen_profiles_init(lv_obj_t *scr) {
     lv_label_set_text(sub_label, "בחר את הפרופיל שלך כדי להתחיל");
     lv_obj_set_width(sub_label, 300);
     lv_obj_set_style_text_align(sub_label, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
-    lv_obj_align(sub_label, LV_ALIGN_TOP_MID, 0, 72);
+    lv_obj_align(sub_label, LV_ALIGN_TOP_MID, 0, 56);
 
-    // 3. Centered Vertical Flex Container for Child Cards
+    // 3. Centered Vertical Flex Container for Child & System Cards
     lv_obj_t *cont = lv_obj_create(scr);
-    lv_obj_set_size(cont, 290, 340);
-    lv_obj_align(cont, LV_ALIGN_TOP_MID, 0, 105);
+    lv_obj_set_size(cont, 290, 395);
+    lv_obj_align(cont, LV_ALIGN_TOP_MID, 0, 84);
     
     lv_obj_set_style_bg_opa(cont, LV_OPA_TRANSP, LV_PART_MAIN);
     lv_obj_set_style_border_width(cont, 0, LV_PART_MAIN);
     lv_obj_set_style_pad_all(cont, 0, LV_PART_MAIN);
-    lv_obj_set_style_pad_row(cont, 14, LV_PART_MAIN);
+    lv_obj_set_style_pad_row(cont, 9, LV_PART_MAIN);
     lv_obj_set_layout(cont, LV_LAYOUT_FLEX);
     lv_obj_set_flex_flow(cont, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(cont, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     lv_obj_remove_flag(cont, LV_OBJ_FLAG_SCROLLABLE);
 
-    // 4. Generate one card for each child profile.
+    // 4. Generate one card for each child profile (Ori, Ethan, Ayala)
     for (size_t i = 0; i < sizeof(PROFILES_DATA) / sizeof(PROFILES_DATA[0]); i++) {
         const ProfileInfo_t *p = &PROFILES_DATA[i];
 
         lv_obj_t *btn = lv_button_create(cont);
-        lv_obj_set_size(btn, 280, 85);
-        lv_obj_set_style_radius(btn, 18, LV_PART_MAIN);
+        lv_obj_set_size(btn, 280, 72);
+        lv_obj_set_style_radius(btn, 16, LV_PART_MAIN);
         lv_obj_set_style_bg_color(btn, lv_color_hex(COLOR_BG_CARD), LV_PART_MAIN);
         lv_obj_set_style_bg_opa(btn, LV_OPA_COVER, LV_PART_MAIN);
 
@@ -560,17 +568,13 @@ void ui_screen_profiles_init(lv_obj_t *scr) {
         lv_obj_set_style_border_opa(btn, (lv_opa_t)LV_OPA_80, LV_PART_MAIN);
 
         // 3D Shadow with profile glow
-        lv_obj_set_style_shadow_width(btn, 14, LV_PART_MAIN);
-        lv_obj_set_style_shadow_ofs_y(btn, 4, LV_PART_MAIN);
+        lv_obj_set_style_shadow_width(btn, 10, LV_PART_MAIN);
+        lv_obj_set_style_shadow_ofs_y(btn, 3, LV_PART_MAIN);
         lv_obj_set_style_shadow_color(btn, lv_color_hex(p->color_accent), LV_PART_MAIN);
         lv_obj_set_style_shadow_opa(btn, (lv_opa_t)LV_OPA_30, LV_PART_MAIN);
 
         // Pressed tactile animation
-        lv_obj_set_style_translate_y(btn, 3, LV_STATE_PRESSED);
-        lv_obj_set_style_transform_scale_x(btn, 252, LV_STATE_PRESSED);
-        lv_obj_set_style_transform_scale_y(btn, 252, LV_STATE_PRESSED);
-        lv_obj_set_style_shadow_ofs_y(btn, 1, LV_STATE_PRESSED);
-        lv_obj_set_style_shadow_width(btn, 6, LV_STATE_PRESSED);
+        lv_obj_set_style_translate_y(btn, 2, LV_STATE_PRESSED);
         lv_obj_set_style_bg_color(btn, lv_color_hex(0x0F172A), LV_STATE_PRESSED);
 
         lv_obj_set_style_base_dir(btn, LV_BASE_DIR_RTL, LV_PART_MAIN);
@@ -578,8 +582,8 @@ void ui_screen_profiles_init(lv_obj_t *scr) {
 
         // Avatar / Badge Icon
         lv_obj_t *badge_box = lv_obj_create(btn);
-        lv_obj_set_size(badge_box, 48, 48);
-        lv_obj_set_style_radius(badge_box, 12, LV_PART_MAIN);
+        lv_obj_set_size(badge_box, 42, 42);
+        lv_obj_set_style_radius(badge_box, 10, LV_PART_MAIN);
         lv_obj_set_style_bg_color(badge_box, lv_color_hex(p->color_accent), LV_PART_MAIN);
         lv_obj_set_style_bg_opa(badge_box, (lv_opa_t)LV_OPA_30, LV_PART_MAIN);
         lv_obj_set_style_border_width(badge_box, 1, LV_PART_MAIN);
@@ -593,22 +597,229 @@ void ui_screen_profiles_init(lv_obj_t *scr) {
         lv_obj_set_style_text_color(badge_txt, lv_color_hex(0xFFFFFF), LV_PART_MAIN);
         lv_obj_center(badge_txt);
 
-        // Child name only; ages are intentionally not displayed.
+        // Child name
         lv_obj_t *name_lbl = lv_label_create(btn);
         lv_label_set_text(name_lbl, p->name_hebrew);
         lv_obj_set_style_text_font(name_lbl, &lv_font_hebrew_24, LV_PART_MAIN);
         lv_obj_set_style_text_color(name_lbl, lv_color_hex(0xFFFFFF), LV_PART_MAIN);
         lv_obj_set_style_base_dir(name_lbl, LV_BASE_DIR_RTL, LV_PART_MAIN);
-        lv_obj_align(name_lbl, LV_ALIGN_RIGHT_MID, -64, -12);
+        lv_obj_align(name_lbl, LV_ALIGN_RIGHT_MID, -56, -10);
 
-        // Child Subtitle / Title Label: e.g. "קוסם בכיר"
+        // Child Subtitle Label
         lv_obj_t *role_lbl = lv_label_create(btn);
         lv_label_set_text(role_lbl, p->title_hebrew);
-        lv_obj_set_style_text_font(role_lbl, &lv_font_hebrew_24, LV_PART_MAIN);
+        lv_obj_set_style_text_font(role_lbl, &lv_font_hebrew_16, LV_PART_MAIN);
         lv_obj_set_style_text_color(role_lbl, lv_color_hex(p->color_accent), LV_PART_MAIN);
         lv_obj_set_style_base_dir(role_lbl, LV_BASE_DIR_RTL, LV_PART_MAIN);
-        lv_obj_align(role_lbl, LV_ALIGN_RIGHT_MID, -64, 14);
+        lv_obj_align(role_lbl, LV_ALIGN_RIGHT_MID, -56, 12);
     }
+
+    // 5. 4th Card: System & OTA Settings ("הגדרות מערכת ומידע ⚙️")
+    lv_obj_t *sys_btn = lv_button_create(cont);
+    lv_obj_set_size(sys_btn, 280, 72);
+    lv_obj_set_style_radius(sys_btn, 16, LV_PART_MAIN);
+    lv_obj_set_style_bg_color(sys_btn, lv_color_hex(COLOR_BG_CARD), LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(sys_btn, LV_OPA_COVER, LV_PART_MAIN);
+    lv_obj_set_style_border_width(sys_btn, 2, LV_PART_MAIN);
+    lv_obj_set_style_border_color(sys_btn, lv_color_hex(0x38BDF8), LV_PART_MAIN); // Radiant Sky Blue
+    lv_obj_set_style_border_opa(sys_btn, (lv_opa_t)LV_OPA_80, LV_PART_MAIN);
+    lv_obj_set_style_shadow_width(sys_btn, 10, LV_PART_MAIN);
+    lv_obj_set_style_shadow_ofs_y(sys_btn, 3, LV_PART_MAIN);
+    lv_obj_set_style_shadow_color(sys_btn, lv_color_hex(0x38BDF8), LV_PART_MAIN);
+    lv_obj_set_style_shadow_opa(sys_btn, (lv_opa_t)LV_OPA_30, LV_PART_MAIN);
+    lv_obj_set_style_translate_y(sys_btn, 2, LV_STATE_PRESSED);
+    lv_obj_set_style_bg_color(sys_btn, lv_color_hex(0x0F172A), LV_STATE_PRESSED);
+    lv_obj_set_style_base_dir(sys_btn, LV_BASE_DIR_RTL, LV_PART_MAIN);
+    lv_obj_add_event_cb(sys_btn, on_system_card_clicked, LV_EVENT_CLICKED, NULL);
+
+    lv_obj_t *sys_badge = lv_obj_create(sys_btn);
+    lv_obj_set_size(sys_badge, 42, 42);
+    lv_obj_set_style_radius(sys_badge, 10, LV_PART_MAIN);
+    lv_obj_set_style_bg_color(sys_badge, lv_color_hex(0x38BDF8), LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(sys_badge, (lv_opa_t)LV_OPA_30, LV_PART_MAIN);
+    lv_obj_set_style_border_width(sys_badge, 1, LV_PART_MAIN);
+    lv_obj_set_style_border_color(sys_badge, lv_color_hex(0x38BDF8), LV_PART_MAIN);
+    lv_obj_align(sys_badge, LV_ALIGN_RIGHT_MID, -6, 0);
+    lv_obj_remove_flag(sys_badge, (lv_obj_flag_t)(LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE));
+
+    lv_obj_t *sys_icon = lv_label_create(sys_badge);
+    lv_label_set_text(sys_icon, "⚙️");
+    lv_obj_set_style_text_font(sys_icon, &lv_font_hebrew_24, LV_PART_MAIN);
+    lv_obj_center(sys_icon);
+
+    lv_obj_t *sys_name = lv_label_create(sys_btn);
+    lv_label_set_text(sys_name, "הגדרות מערכת ומידע");
+    lv_obj_set_style_text_font(sys_name, &lv_font_hebrew_24, LV_PART_MAIN);
+    lv_obj_set_style_text_color(sys_name, lv_color_hex(0xFFFFFF), LV_PART_MAIN);
+    lv_obj_set_style_base_dir(sys_name, LV_BASE_DIR_RTL, LV_PART_MAIN);
+    lv_obj_align(sys_name, LV_ALIGN_RIGHT_MID, -56, -10);
+
+    lv_obj_t *sys_sub = lv_label_create(sys_btn);
+    lv_label_set_text(sys_sub, "גרסה, Wi-Fi ועדכוני OTA");
+    lv_obj_set_style_text_font(sys_sub, &lv_font_hebrew_16, LV_PART_MAIN);
+    lv_obj_set_style_text_color(sys_sub, lv_color_hex(0x38BDF8), LV_PART_MAIN);
+    lv_obj_set_style_base_dir(sys_sub, LV_BASE_DIR_RTL, LV_PART_MAIN);
+    lv_obj_align(sys_sub, LV_ALIGN_RIGHT_MID, -56, 12);
+}
+
+/* ========================================================================== */
+/*                         SCREEN BUILDER: SYSTEM & OTA                       */
+/* ========================================================================== */
+
+static void on_system_back_clicked(lv_event_t *e) {
+    if (lv_event_get_code(e) == LV_EVENT_CLICKED) {
+        audio_play_click();
+        sm_load_screen(SCREEN_PROFILES);
+    }
+}
+
+static void on_test_audio_clicked(lv_event_t *e) {
+    if (lv_event_get_code(e) == LV_EVENT_CLICKED) {
+        audio_play_voice_success();
+    }
+}
+
+void ui_screen_system_init(lv_obj_t *scr) {
+    /* 1. Top HUD Bar */
+    lv_obj_t *hud = lv_obj_create(scr);
+    lv_obj_set_size(hud, BSP_LCD_H_RES, 50);
+    lv_obj_align(hud, LV_ALIGN_TOP_MID, 0, 0);
+    lv_obj_set_style_bg_color(hud, lv_color_hex(0x000000), LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(hud, (lv_opa_t)LV_OPA_60, LV_PART_MAIN);
+    lv_obj_set_style_border_width(hud, 0, LV_PART_MAIN);
+    lv_obj_set_style_radius(hud, 0, LV_PART_MAIN);
+    lv_obj_set_layout(hud, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(hud, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(hud, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_remove_flag(hud, LV_OBJ_FLAG_SCROLLABLE);
+
+    // Title on Right
+    lv_obj_t *title_lbl = lv_label_create(hud);
+    lv_label_set_text(title_lbl, "הגדרות מערכת ⚙️");
+    lv_obj_set_style_text_font(title_lbl, &lv_font_hebrew_24, LV_PART_MAIN);
+    lv_obj_set_style_text_color(title_lbl, lv_color_hex(0x38BDF8), LV_PART_MAIN);
+    lv_obj_set_style_base_dir(title_lbl, LV_BASE_DIR_RTL, LV_PART_MAIN);
+
+    // Back to Profiles Button on Left
+    lv_obj_t *back_btn = lv_button_create(hud);
+    lv_obj_set_size(back_btn, 65, 35);
+    lv_obj_set_style_bg_color(back_btn, lv_color_hex(0x334155), LV_PART_MAIN);
+    lv_obj_set_style_radius(back_btn, 8, LV_PART_MAIN);
+    lv_obj_add_event_cb(back_btn, on_system_back_clicked, LV_EVENT_CLICKED, NULL);
+
+    lv_obj_t *back_lbl = lv_label_create(back_btn);
+    lv_label_set_text(back_lbl, "חזור");
+    lv_obj_set_style_text_font(back_lbl, &lv_font_hebrew_24, LV_PART_MAIN);
+    lv_obj_set_style_text_color(back_lbl, lv_color_hex(0xFFFFFF), LV_PART_MAIN);
+    lv_obj_center(back_lbl);
+
+    /* 2. Scrollable Container for System Cards */
+    lv_obj_t *scroll = lv_obj_create(scr);
+    lv_obj_set_size(scroll, BSP_LCD_H_RES, BSP_LCD_V_RES - 50);
+    lv_obj_align(scroll, LV_ALIGN_TOP_MID, 0, 50);
+    lv_obj_set_style_bg_opa(scroll, LV_OPA_TRANSP, LV_PART_MAIN);
+    lv_obj_set_style_border_width(scroll, 0, LV_PART_MAIN);
+    lv_obj_set_style_pad_all(scroll, 12, LV_PART_MAIN);
+    lv_obj_set_style_pad_row(scroll, 12, LV_PART_MAIN);
+    lv_obj_set_layout(scroll, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(scroll, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(scroll, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+
+    /* --- Card 1: Firmware Build & Date --- */
+    lv_obj_t *card_fw = lv_obj_create(scroll);
+    theme_apply_card(card_fw);
+    lv_obj_set_size(card_fw, 296, 115);
+    lv_obj_set_style_border_color(card_fw, lv_color_hex(0x38BDF8), LV_PART_MAIN);
+    lv_obj_remove_flag(card_fw, LV_OBJ_FLAG_SCROLLABLE);
+
+    lv_obj_t *fw_title = lv_label_create(card_fw);
+    lv_label_set_text(fw_title, "📦 גרסת קושחה ועדכון:");
+    lv_obj_set_style_text_font(fw_title, &lv_font_hebrew_24, LV_PART_MAIN);
+    lv_obj_set_style_text_color(fw_title, lv_color_hex(0x38BDF8), LV_PART_MAIN);
+    lv_obj_set_style_base_dir(fw_title, LV_BASE_DIR_RTL, LV_PART_MAIN);
+    lv_obj_align(fw_title, LV_ALIGN_TOP_RIGHT, 0, 0);
+
+    lv_obj_t *fw_date = lv_label_create(card_fw);
+    char date_buf[96];
+    snprintf(date_buf, sizeof(date_buf), "תאריך בנייה: %s %s\nמאגר שאלות: %u שאלות מוטמעות",
+             __DATE__, __TIME__, (unsigned)quiz_get_total_questions());
+    lv_label_set_text(fw_date, date_buf);
+    lv_obj_set_style_text_font(fw_date, &lv_font_hebrew_16, LV_PART_MAIN);
+    lv_obj_set_style_text_color(fw_date, lv_color_hex(0xE2E8F0), LV_PART_MAIN);
+    lv_obj_set_style_base_dir(fw_date, LV_BASE_DIR_RTL, LV_PART_MAIN);
+    lv_obj_align(fw_date, LV_ALIGN_TOP_RIGHT, 0, 32);
+
+    /* --- Card 2: Wi-Fi & Network Status --- */
+    lv_obj_t *card_wifi = lv_obj_create(scroll);
+    theme_apply_card(card_wifi);
+    lv_obj_set_size(card_wifi, 296, 105);
+    lv_obj_set_style_border_color(card_wifi, lv_color_hex(0x10B981), LV_PART_MAIN);
+    lv_obj_remove_flag(card_wifi, LV_OBJ_FLAG_SCROLLABLE);
+
+    lv_obj_t *wifi_title = lv_label_create(card_wifi);
+    lv_label_set_text(wifi_title, "🌐 סטטוס Wi-Fi ורשת:");
+    lv_obj_set_style_text_font(wifi_title, &lv_font_hebrew_24, LV_PART_MAIN);
+    lv_obj_set_style_text_color(wifi_title, lv_color_hex(0x10B981), LV_PART_MAIN);
+    lv_obj_set_style_base_dir(wifi_title, LV_BASE_DIR_RTL, LV_PART_MAIN);
+    lv_obj_align(wifi_title, LV_ALIGN_TOP_RIGHT, 0, 0);
+
+    lv_obj_t *wifi_info = lv_label_create(card_wifi);
+    char wifi_buf[96];
+    bool wifi_connected = (WiFi.status() == WL_CONNECTED);
+    snprintf(wifi_buf, sizeof(wifi_buf), "מצב: %s\nIP: %s | SSID: %s",
+             wifi_connected ? "מחובר ✅" : "לא מחובר ❌",
+             wifi_connected ? WiFi.localIP().toString().c_str() : "0.0.0.0",
+             WiFi.SSID().length() > 0 ? WiFi.SSID().c_str() : DEFAULT_WIFI_SSID);
+    lv_label_set_text(wifi_info, wifi_buf);
+    lv_obj_set_style_text_font(wifi_info, &lv_font_hebrew_16, LV_PART_MAIN);
+    lv_obj_set_style_text_color(wifi_info, lv_color_hex(0xE2E8F0), LV_PART_MAIN);
+    lv_obj_set_style_base_dir(wifi_info, LV_BASE_DIR_RTL, LV_PART_MAIN);
+    lv_obj_align(wifi_info, LV_ALIGN_TOP_RIGHT, 0, 32);
+
+    /* --- Card 3: OTA Update Trigger --- */
+    lv_obj_t *card_ota = lv_obj_create(scroll);
+    theme_apply_card(card_ota);
+    lv_obj_set_size(card_ota, 296, 110);
+    lv_obj_set_style_border_color(card_ota, lv_color_hex(0xF59E0B), LV_PART_MAIN);
+    lv_obj_remove_flag(card_ota, LV_OBJ_FLAG_SCROLLABLE);
+
+    lv_obj_t *ota_title = lv_label_create(card_ota);
+    lv_label_set_text(ota_title, "🔄 עדכון קושחה בענן (OTA):");
+    lv_obj_set_style_text_font(ota_title, &lv_font_hebrew_24, LV_PART_MAIN);
+    lv_obj_set_style_text_color(ota_title, lv_color_hex(0xF59E0B), LV_PART_MAIN);
+    lv_obj_set_style_base_dir(ota_title, LV_BASE_DIR_RTL, LV_PART_MAIN);
+    lv_obj_align(ota_title, LV_ALIGN_TOP_RIGHT, 0, 0);
+
+    lv_obj_t *ota_start_btn = lv_button_create(card_ota);
+    theme_apply_btn_main(ota_start_btn);
+    lv_obj_set_size(ota_start_btn, 240, 42);
+    lv_obj_set_style_bg_color(ota_start_btn, lv_color_hex(0x0284C7), LV_PART_MAIN);
+    lv_obj_align(ota_start_btn, LV_ALIGN_BOTTOM_MID, 0, -5);
+    lv_obj_add_event_cb(ota_start_btn, on_ota_button_clicked, LV_EVENT_CLICKED, NULL);
+
+    lv_obj_t *btn_ota_lbl = lv_label_create(ota_start_btn);
+    lv_label_set_text(btn_ota_lbl, "בדוק והתקן עדכון עכשיו 🚀");
+    lv_obj_set_style_text_font(btn_ota_lbl, &lv_font_hebrew_16, LV_PART_MAIN);
+    lv_obj_center(btn_ota_lbl);
+
+    /* --- Card 4: Audio Speaker Test --- */
+    lv_obj_t *card_snd = lv_obj_create(scroll);
+    theme_apply_card(card_snd);
+    lv_obj_set_size(card_snd, 296, 95);
+    lv_obj_set_style_border_color(card_snd, lv_color_hex(0xA855F7), LV_PART_MAIN);
+    lv_obj_remove_flag(card_snd, LV_OBJ_FLAG_SCROLLABLE);
+
+    lv_obj_t *snd_btn = lv_button_create(card_snd);
+    theme_apply_btn_main(snd_btn);
+    lv_obj_set_size(snd_btn, 240, 42);
+    lv_obj_set_style_bg_color(snd_btn, lv_color_hex(0x7C3AED), LV_PART_MAIN);
+    lv_obj_center(snd_btn);
+    lv_obj_add_event_cb(snd_btn, on_test_audio_clicked, LV_EVENT_CLICKED, NULL);
+
+    lv_obj_t *snd_lbl = lv_label_create(snd_btn);
+    lv_label_set_text(snd_lbl, "🔊 בדיקת קול עברי (\"כל הכבוד\")");
+    lv_obj_set_style_text_font(snd_lbl, &lv_font_hebrew_16, LV_PART_MAIN);
+    lv_obj_center(snd_lbl);
 }
 
 /* ========================================================================== */
@@ -819,6 +1030,9 @@ void sm_load_screen(ScreenID_t screen_id) {
             break;
         case SCREEN_QUIZ:
             ui_screen_quiz_init(new_scr);
+            break;
+        case SCREEN_SYSTEM:
+            ui_screen_system_init(new_scr);
             break;
         default:
             Serial.printf("[SM] WARN: Unknown screen ID %d, loading profiles.\n", (int)screen_id);
