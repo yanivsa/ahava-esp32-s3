@@ -9,8 +9,11 @@
 #include "nvs.h"
 #include "esp_err.h"
 #include <limits.h>
+#include <time.h>
 
 #define NVS_STORAGE_NAMESPACE "wizard_nvs"
+#define ISRAEL_TZ "IST-2IDT,M3.4.4/26,M10.5.0"
+
 
 /* ========================================================================== */
 /*                         INTERNAL NVS HELPERS                               */
@@ -114,25 +117,82 @@ void player_data_add_xp(WizardProfile_t profile, uint32_t amount) {
     }
 }
 
+void player_data_sync_time(void) {
+    Serial.println("[TIME] Configuring SNTP for Israel timezone...");
+    configTzTime(ISRAEL_TZ, "pool.ntp.org", "time.google.com");
+}
+
+bool player_data_is_time_synced(void) {
+    time_t now = time(NULL);
+    struct tm timeinfo;
+    if (localtime_r(&now, &timeinfo) != NULL) {
+        return (timeinfo.tm_year + 1900 >= 2025);
+    }
+    return false;
+}
+
+uint32_t player_data_get_current_date(void) {
+    time_t now = time(NULL);
+    struct tm timeinfo;
+    if (localtime_r(&now, &timeinfo) != NULL && (timeinfo.tm_year + 1900 >= 2025)) {
+        return (uint32_t)((timeinfo.tm_year + 1900) * 10000 + (timeinfo.tm_mon + 1) * 100 + timeinfo.tm_mday);
+    }
+    return 0;
+}
+
 uint32_t player_data_get_questions_today(WizardProfile_t profile) {
     if (profile <= PROFILE_NONE || profile >= PROFILE_MAX) return 0;
-    char key[16];
-    snprintf(key, sizeof(key), "qt_%d", (int)profile);
-    return nvs_read_u32_val(key, 0);
+    char count_key[16];
+    char date_key[16];
+    snprintf(count_key, sizeof(count_key), "qt_%d", (int)profile);
+    snprintf(date_key, sizeof(date_key), "d_%d", (int)profile);
+
+    uint32_t today = player_data_get_current_date();
+    if (today > 0) {
+        uint32_t saved_date = nvs_read_u32_val(date_key, 0);
+        if (saved_date != today) {
+            // Day rolled over (midnight passed) or first time run today
+            Serial.printf("[NVS] Profile %d: New day detected (%u vs saved %u). Resetting daily questions to 0.\n",
+                          (int)profile, today, saved_date);
+            nvs_write_u32_val(date_key, today);
+            nvs_write_u32_val(count_key, 0);
+            return 0;
+        }
+    }
+    return nvs_read_u32_val(count_key, 0);
 }
 
 uint32_t player_data_increment_questions_today(WizardProfile_t profile) {
     if (profile <= PROFILE_NONE || profile >= PROFILE_MAX) return 0;
-    char key[16];
-    snprintf(key, sizeof(key), "qt_%d", (int)profile);
+    char count_key[16];
+    char date_key[16];
+    snprintf(count_key, sizeof(count_key), "qt_%d", (int)profile);
+    snprintf(date_key, sizeof(date_key), "d_%d", (int)profile);
 
-    uint32_t current_count = nvs_read_u32_val(key, 0);
-    uint32_t new_count = current_count + 1;
+    uint32_t today = player_data_get_current_date();
+    uint32_t new_count = 1;
 
-    if (nvs_write_u32_val(key, new_count)) {
-        Serial.printf("[NVS] Profile %d: Answered today count -> %u 🎯\n", 
-                      (int)profile, new_count);
+    if (today > 0) {
+        uint32_t saved_date = nvs_read_u32_val(date_key, 0);
+        if (saved_date != today) {
+            // New day
+            nvs_write_u32_val(date_key, today);
+            nvs_write_u32_val(count_key, 1);
+            Serial.printf("[NVS] Profile %d: First question of today (%u) -> count: 1 🎯\n",
+                          (int)profile, today);
+            return 1;
+        }
     }
+
+    uint32_t current_count = nvs_read_u32_val(count_key, 0);
+    new_count = current_count + 1;
+    nvs_write_u32_val(count_key, new_count);
+    if (today > 0) {
+        nvs_write_u32_val(date_key, today);
+    }
+
+    Serial.printf("[NVS] Profile %d: Answered today count -> %u 🎯 (Date: %u)\n", 
+                  (int)profile, new_count, today);
     return new_count;
 }
 
@@ -145,3 +205,4 @@ void player_data_reset_all(void) {
         Serial.println("[NVS] All wizard profiles reset to 0.");
     }
 }
+

@@ -69,6 +69,12 @@ extern "C" {
 #define BSP_AUDIO_ENABLED          1    // I2S Audio synthesizer & Hebrew TTS playback
 #define BSP_OTA_ENABLED            1    // Wi-Fi is provisioned at runtime; firmware is fetched over verified HTTPS
 
+/* ========================================================================== */
+/*                         BATTERY & POWER SENSING                            */
+/* ========================================================================== */
+#define BSP_BAT_ADC_PIN            6    // ADC1 Channel 5 (VBAT divider 1:2)
+#define BSP_USB_SENSE_PIN          7    // ADC1 Channel 6 (USB 5V divider 1:2)
+
 #define BSP_AUDIO_TASK_NAME        "audio_task"
 #define BSP_AUDIO_TASK_STACK_SIZE  (1024 * 4)   // 4 KB Stack
 #define BSP_AUDIO_TASK_PRIORITY    3            // Normal audio priority

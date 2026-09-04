@@ -67,6 +67,24 @@ uint32_t player_data_increment_questions_today(WizardProfile_t profile);
  */
 void player_data_reset_all(void);
 
+/**
+ * @brief Synchronize system time via SNTP for Israel timezone (IST-2IDT).
+ */
+void player_data_sync_time(void);
+
+/**
+ * @brief Check if system time has been synchronized from NTP.
+ * @return true if valid year (>= 2025).
+ */
+bool player_data_is_time_synced(void);
+
+/**
+ * @brief Get current calendar date in Israel timezone as an integer YYYYMMDD.
+ *        Returns 0 if time has not been synchronized yet.
+ */
+uint32_t player_data_get_current_date(void);
+
 #ifdef __cplusplus
 }
 #endif
+

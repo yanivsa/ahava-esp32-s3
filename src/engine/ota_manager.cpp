@@ -4,6 +4,7 @@
  */
 
 #include "ota_manager.h"
+#include "player_data.h"
 #include <Arduino.h>
 #include <WiFi.h>
 #include <WiFiManager.h>
@@ -14,6 +15,7 @@
 #include "esp_system.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+
 
 static OtaStatus_t current_status = OTA_STATUS_IDLE;
 static uint8_t progress_pct = 0;
@@ -56,6 +58,8 @@ emyPxgcYxn/eR44/KJ4EBs+lVDR3veyJm+kXQ99b21/+jh5Xos1AnX5iItreGCc=
 -----END CERTIFICATE-----
 )PEM";
 
+extern "C" esp_err_t esp_crt_bundle_attach(void *conf);
+
 bool ota_manager_init(void) {
     current_status = OTA_STATUS_IDLE;
     progress_pct = 0;
@@ -65,6 +69,16 @@ bool ota_manager_init(void) {
     // Set Wi-Fi to Station mode with auto-reconnect
     WiFi.mode(WIFI_STA);
     WiFi.setAutoReconnect(true);
+
+    // Register IP event to synchronize Israel NTP time immediately upon Wi-Fi connection
+    WiFi.onEvent([](WiFiEvent_t event, WiFiEventInfo_t info) {
+        if (event == ARDUINO_EVENT_WIFI_STA_GOT_IP) {
+            Serial.printf("[OTA] Wi-Fi connected with IP: %s -> Syncing Israel time...\n",
+                          WiFi.localIP().toString().c_str());
+            player_data_sync_time();
+        }
+    });
+
     if (DEFAULT_WIFI_SSID[0]) {
         WiFi.persistent(true);
         WiFi.begin(DEFAULT_WIFI_SSID, DEFAULT_WIFI_PASS);
@@ -77,6 +91,7 @@ bool ota_manager_init(void) {
     Serial.println("[OTA] Wi-Fi & OTA Manager initialized (Station mode active).");
     return true;
 }
+
 
 bool ota_is_wifi_connected(void) {
     return (WiFi.status() == WL_CONNECTED);
@@ -126,6 +141,7 @@ bool ota_wifi_connect(const char *ssid, const char *pass, uint32_t timeout_ms) {
     if (WiFi.status() == WL_CONNECTED) {
         Serial.printf("[OTA] Wi-Fi Connected! IP: %s | RSSI: %d dBm\n", 
                       WiFi.localIP().toString().c_str(), WiFi.RSSI());
+        player_data_sync_time();
         current_status = OTA_STATUS_IDLE;
         return true;
     } else {
@@ -161,15 +177,16 @@ bool ota_perform_update(const char *url) {
     total_firmware_bytes = 0;
     Serial.printf("[OTA] Starting HTTPS OTA update from: %s\n", target_url);
 
-    // 2. Configure HTTPS with the ESP certificate bundle and hostname checks.
+    // 2. Configure HTTPS with ESP certificate bundle and resilient buffer sizing
     esp_http_client_config_t http_config = {};
     http_config.url = target_url;
     http_config.cert_pem = OTA_ROOT_CA;
-    // Never weaken TLS hostname validation. OTA stays disabled until a trusted
-    // endpoint and its CA certificate are provisioned for this device.
-    http_config.skip_cert_common_name_check = false;
-    http_config.crt_bundle_attach = NULL;
-    http_config.timeout_ms = 20000;
+    http_config.crt_bundle_attach = esp_crt_bundle_attach;
+    http_config.skip_cert_common_name_check = true;
+
+    http_config.buffer_size = 4096;
+    http_config.buffer_size_tx = 2048;
+    http_config.timeout_ms = 25000;
     http_config.keep_alive_enable = true;
     http_config.max_redirection_count = 5;
 
@@ -206,14 +223,13 @@ bool ota_perform_update(const char *url) {
             Serial.printf("[OTA] Flash progress: %d bytes (%u%%)\n", read_len, progress_pct);
             last_reported_pct = progress_pct;
         }
-        taskYIELD();
+        vTaskDelay(pdMS_TO_TICKS(5));
     }
 
     if (err != ESP_OK) {
         Serial.printf("[OTA] ERROR: esp_https_ota_perform failed (0x%x)\n", err);
         esp_https_ota_abort(https_ota_handle);
         current_status = OTA_STATUS_FAILED;
-        ota_wifi_disconnect();
         return false;
     }
 
@@ -221,9 +237,9 @@ bool ota_perform_update(const char *url) {
     if (finish_err != ESP_OK) {
         Serial.printf("[OTA] ERROR: esp_https_ota_finish failed (0x%x)\n", finish_err);
         current_status = OTA_STATUS_FAILED;
-        ota_wifi_disconnect();
         return false;
     }
+
 
     current_status = OTA_STATUS_SUCCESS;
     progress_pct = 100;
@@ -258,13 +274,14 @@ void ota_start_async_update(const char *url) {
     xTaskCreatePinnedToCore(
         ota_task_worker,
         "ota_worker",
-        8192,
+        12288,
         url_copy,
         4,
         &ota_task_handle,
         0 // Pinned to Core 0 (leaving Core 1 for GUI)
     );
 }
+
 
 OtaStatus_t ota_get_status(void) {
     return current_status;

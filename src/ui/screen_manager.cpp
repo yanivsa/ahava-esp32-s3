@@ -9,9 +9,11 @@
 #include "player_data.h"
 #include "audio_manager.h"
 #include "ota_manager.h"
+#include "hal_battery.h"
 #include "hal_lvgl.h"
 #include "bsp_config.h"
 #include <Arduino.h>
+
 #include <WiFi.h>
 #include "esp_heap_caps.h"
 
@@ -63,12 +65,82 @@ const ProfileInfo_t* sm_get_profile_info(WizardProfile_t profile) {
     return &PROFILES_DATA[0];
 }
 
+/* Live UI tracking handles for periodic dynamic updates */
+static lv_obj_t *s_active_hud_bat_lbl = NULL;
+static lv_obj_t *s_active_hud_today_lbl = NULL;
+static lv_obj_t *s_active_sys_bat_bar = NULL;
+static lv_obj_t *s_active_sys_bat_info = NULL;
+static lv_obj_t *s_active_sys_wifi_info = NULL;
+static lv_timer_t *s_live_status_timer = NULL;
+
+static void ui_live_status_timer_cb(lv_timer_t *timer) {
+    (void)timer;
+
+    // 1. Update active HUD battery indicator
+    if (s_active_hud_bat_lbl && lv_obj_is_valid(s_active_hud_bat_lbl)) {
+        char bat_buf[32];
+        uint8_t bat_pct = hal_battery_get_percentage();
+        snprintf(bat_buf, sizeof(bat_buf), "%s %u%%", hal_battery_get_icon(), (unsigned)bat_pct);
+        lv_label_set_text(s_active_hud_bat_lbl, bat_buf);
+        lv_obj_set_style_text_color(s_active_hud_bat_lbl, 
+            lv_color_hex(hal_battery_is_charging() ? 0x38BDF8 : (bat_pct > 20 ? 0x10B981 : 0xEF4444)), 
+            LV_PART_MAIN);
+    }
+
+    // 2. Update active HUD today count (e.g. if midnight passed while screen was open)
+    if (s_active_hud_today_lbl && lv_obj_is_valid(s_active_hud_today_lbl) && current_profile != PROFILE_NONE) {
+        uint32_t questions_today = player_data_get_questions_today(current_profile);
+        char today_buf[48];
+        if (current_screen_id == SCREEN_QUIZ) {
+            snprintf(today_buf, sizeof(today_buf), "%u 🎯", (unsigned int)questions_today);
+        } else {
+            snprintf(today_buf, sizeof(today_buf), "שאלות: %u 🎯", (unsigned int)questions_today);
+        }
+        lv_label_set_text(s_active_hud_today_lbl, today_buf);
+    }
+
+    // 3. Update active System screen battery card
+    if (s_active_sys_bat_bar && lv_obj_is_valid(s_active_sys_bat_bar)) {
+        uint8_t bat_pct = hal_battery_get_percentage();
+        bool is_charging = hal_battery_is_charging();
+        uint32_t bat_color = is_charging ? 0x38BDF8 : (bat_pct > 35 ? 0x10B981 : (bat_pct > 15 ? 0xF59E0B : 0xEF4444));
+        lv_bar_set_value(s_active_sys_bat_bar, bat_pct, LV_ANIM_OFF);
+        lv_obj_set_style_bg_color(s_active_sys_bat_bar, lv_color_hex(bat_color), LV_PART_INDICATOR);
+    }
+    if (s_active_sys_bat_info && lv_obj_is_valid(s_active_sys_bat_info)) {
+        char bat_info_buf[96];
+        uint8_t bat_pct = hal_battery_get_percentage();
+        uint32_t bat_mv = hal_battery_get_voltage_mv();
+        bool is_charging = hal_battery_is_charging();
+        snprintf(bat_info_buf, sizeof(bat_info_buf), "רמה: %u%% | מתח: %.2fV\nמצב: %s",
+                 (unsigned)bat_pct,
+                 (float)bat_mv / 1000.0f,
+                 is_charging ? (bat_mv < 2500 ? "חשמל USB 🔌 (ללא סוללה)" : "מחובר לטעינה ⚡") : "פועל על סוללה 🔋");
+        lv_label_set_text(s_active_sys_bat_info, bat_info_buf);
+    }
+
+    // 4. Update active System screen Wi-Fi card
+    if (s_active_sys_wifi_info && lv_obj_is_valid(s_active_sys_wifi_info)) {
+        char wifi_buf[96];
+        bool wifi_connected = (WiFi.status() == WL_CONNECTED);
+        snprintf(wifi_buf, sizeof(wifi_buf), "מצב: %s\nIP: %s | SSID: %s",
+                 wifi_connected ? "מחובר ✅" : "לא מחובר ❌",
+                 wifi_connected ? WiFi.localIP().toString().c_str() : "0.0.0.0",
+                 WiFi.SSID().length() > 0 ? WiFi.SSID().c_str() : DEFAULT_WIFI_SSID);
+        lv_label_set_text(s_active_sys_wifi_info, wifi_buf);
+    }
+}
+
 void sm_init(void) {
     current_profile = PROFILE_NONE;
     current_screen_id = SCREEN_NONE;
     theme_manager_init();
-    Serial.println("[SM] Screen Manager initialized.");
+    if (!s_live_status_timer) {
+        s_live_status_timer = lv_timer_create(ui_live_status_timer_cb, 3000, NULL);
+    }
+    Serial.println("[SM] Screen Manager initialized with live UI telemetry.");
 }
+
 
 ScreenID_t sm_get_current_screen(void) {
     return current_screen_id;
@@ -313,9 +385,20 @@ static void on_answer_clicked(lv_event_t *e) {
     }
 
     // 3. Process Reward & Visual feedback on buttons
+    uint32_t today_count = player_data_increment_questions_today(current_profile);
+    Serial.printf("[QUIZ] Profile %d answered question -> Today's total: %u\n",
+                  (int)current_profile, today_count);
+
+    if (s_active_hud_today_lbl && lv_obj_is_valid(s_active_hud_today_lbl)) {
+        char today_buf[48];
+        snprintf(today_buf, sizeof(today_buf), "%u 🎯", (unsigned int)today_count);
+        lv_label_set_text(s_active_hud_today_lbl, today_buf);
+    }
+
     if (is_correct) {
         player_data_add_coins(current_profile, 10);
         player_data_add_xp(current_profile, 25);
+
 
         Serial.printf("[REWARD] Profile %d rewarded! New Coins: %u 🪙 | New XP: %u ⚡\n",
                       (int)current_profile,
@@ -436,12 +519,34 @@ void ui_screen_quiz_init(lv_obj_t *scr) {
     lv_obj_set_style_text_color(lbl_profile, lv_color_hex(p->color_accent), LV_PART_MAIN);
     lv_obj_set_style_base_dir(lbl_profile, LV_BASE_DIR_RTL, LV_PART_MAIN);
 
+    // Daily Questions Count Center: "X 🎯"
+    lv_obj_t *lbl_today = lv_label_create(hud);
+    char today_buf[48];
+    uint32_t questions_today = player_data_get_questions_today(current_profile);
+    snprintf(today_buf, sizeof(today_buf), "%u 🎯", (unsigned int)questions_today);
+    lv_label_set_text(lbl_today, today_buf);
+    lv_obj_set_style_text_font(lbl_today, &lv_font_hebrew_16, LV_PART_MAIN);
+    lv_obj_set_style_text_color(lbl_today, lv_color_hex(0x38BDF8), LV_PART_MAIN);
+    lv_obj_set_style_base_dir(lbl_today, LV_BASE_DIR_RTL, LV_PART_MAIN);
+
+    // Battery Indicator
+    lv_obj_t *lbl_bat = lv_label_create(hud);
+    char bat_buf[32];
+    uint8_t bat_pct = hal_battery_get_percentage();
+    snprintf(bat_buf, sizeof(bat_buf), "%s %u%%", hal_battery_get_icon(), (unsigned)bat_pct);
+    lv_label_set_text(lbl_bat, bat_buf);
+    lv_obj_set_style_text_font(lbl_bat, &lv_font_hebrew_16, LV_PART_MAIN);
+    lv_obj_set_style_text_color(lbl_bat, lv_color_hex(hal_battery_is_charging() ? 0x38BDF8 : (bat_pct > 20 ? 0x10B981 : 0xEF4444)), LV_PART_MAIN);
+    s_active_hud_bat_lbl = lbl_bat;
+    s_active_hud_today_lbl = lbl_today;
+
     // Back to Dashboard Button on Left
     lv_obj_t *back_btn = lv_button_create(hud);
     lv_obj_set_size(back_btn, 65, 35);
     lv_obj_set_style_bg_color(back_btn, lv_color_hex(0x334155), LV_PART_MAIN);
     lv_obj_set_style_radius(back_btn, 8, LV_PART_MAIN);
     lv_obj_add_event_cb(back_btn, on_back_to_dashboard_clicked, LV_EVENT_CLICKED, NULL);
+
 
     lv_obj_t *back_lbl = lv_label_create(back_btn);
     lv_label_set_text(back_lbl, "חזור");
@@ -669,9 +774,14 @@ void ui_screen_profiles_init(lv_obj_t *scr) {
 static void on_system_back_clicked(lv_event_t *e) {
     if (lv_event_get_code(e) == LV_EVENT_CLICKED) {
         audio_play_click();
-        sm_load_screen(SCREEN_PROFILES);
+        if (current_profile != PROFILE_NONE) {
+            sm_load_screen(SCREEN_DASHBOARD);
+        } else {
+            sm_load_screen(SCREEN_PROFILES);
+        }
     }
 }
+
 
 static void on_test_audio_clicked(lv_event_t *e) {
     if (lv_event_get_code(e) == LV_EVENT_CLICKED) {
@@ -725,12 +835,58 @@ void ui_screen_system_init(lv_obj_t *scr) {
     lv_obj_set_flex_flow(scroll, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(scroll, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
 
+    /* --- Card 0: Battery & Power Status --- */
+    lv_obj_t *card_bat = lv_obj_create(scroll);
+    theme_apply_card(card_bat);
+    lv_obj_set_size(card_bat, 296, 125);
+    uint8_t bat_pct = hal_battery_get_percentage();
+    bool is_charging = hal_battery_is_charging();
+    uint32_t bat_mv = hal_battery_get_voltage_mv();
+    uint32_t bat_color = is_charging ? 0x38BDF8 : (bat_pct > 35 ? 0x10B981 : (bat_pct > 15 ? 0xF59E0B : 0xEF4444));
+
+    lv_obj_set_style_border_color(card_bat, lv_color_hex(bat_color), LV_PART_MAIN);
+    lv_obj_remove_flag(card_bat, LV_OBJ_FLAG_SCROLLABLE);
+
+    lv_obj_t *bat_title = lv_label_create(card_bat);
+    char bat_title_buf[48];
+    snprintf(bat_title_buf, sizeof(bat_title_buf), "%s מצב סוללה וחשמל:", hal_battery_get_icon());
+    lv_label_set_text(bat_title, bat_title_buf);
+    lv_obj_set_style_text_font(bat_title, &lv_font_hebrew_24, LV_PART_MAIN);
+    lv_obj_set_style_text_color(bat_title, lv_color_hex(bat_color), LV_PART_MAIN);
+    lv_obj_set_style_base_dir(bat_title, LV_BASE_DIR_RTL, LV_PART_MAIN);
+    lv_obj_align(bat_title, LV_ALIGN_TOP_RIGHT, 0, 0);
+
+    lv_obj_t *bat_bar = lv_bar_create(card_bat);
+    lv_obj_set_size(bat_bar, 250, 14);
+    lv_obj_align(bat_bar, LV_ALIGN_TOP_MID, 0, 36);
+    lv_bar_set_range(bat_bar, 0, 100);
+    lv_bar_set_value(bat_bar, bat_pct, LV_ANIM_OFF);
+    lv_obj_set_style_bg_color(bat_bar, lv_color_hex(0x1E293B), LV_PART_MAIN);
+    lv_obj_set_style_bg_color(bat_bar, lv_color_hex(bat_color), LV_PART_INDICATOR);
+    lv_obj_set_style_radius(bat_bar, 7, LV_PART_MAIN);
+    lv_obj_set_style_radius(bat_bar, 7, LV_PART_INDICATOR);
+
+    lv_obj_t *bat_info = lv_label_create(card_bat);
+    char bat_info_buf[96];
+    snprintf(bat_info_buf, sizeof(bat_info_buf), "רמה: %u%% | מתח: %.2fV\nמצב: %s",
+             (unsigned)bat_pct,
+             (float)bat_mv / 1000.0f,
+             is_charging ? "מחובר לטעינה ⚡" : "פועל על סוללה 🔋");
+    lv_label_set_text(bat_info, bat_info_buf);
+    lv_obj_set_style_text_font(bat_info, &lv_font_hebrew_16, LV_PART_MAIN);
+    lv_obj_set_style_text_color(bat_info, lv_color_hex(0xE2E8F0), LV_PART_MAIN);
+    lv_obj_set_style_base_dir(bat_info, LV_BASE_DIR_RTL, LV_PART_MAIN);
+    lv_obj_align(bat_info, LV_ALIGN_TOP_RIGHT, 0, 58);
+    s_active_sys_bat_bar = bat_bar;
+    s_active_sys_bat_info = bat_info;
+
     /* --- Card 1: Firmware Build & Date --- */
     lv_obj_t *card_fw = lv_obj_create(scroll);
     theme_apply_card(card_fw);
     lv_obj_set_size(card_fw, 296, 115);
     lv_obj_set_style_border_color(card_fw, lv_color_hex(0x38BDF8), LV_PART_MAIN);
     lv_obj_remove_flag(card_fw, LV_OBJ_FLAG_SCROLLABLE);
+
 
     lv_obj_t *fw_title = lv_label_create(card_fw);
     lv_label_set_text(fw_title, "📦 גרסת קושחה ועדכון:");
@@ -775,6 +931,7 @@ void ui_screen_system_init(lv_obj_t *scr) {
     lv_obj_set_style_text_color(wifi_info, lv_color_hex(0xE2E8F0), LV_PART_MAIN);
     lv_obj_set_style_base_dir(wifi_info, LV_BASE_DIR_RTL, LV_PART_MAIN);
     lv_obj_align(wifi_info, LV_ALIGN_TOP_RIGHT, 0, 32);
+    s_active_sys_wifi_info = wifi_info;
 
     /* --- Card 3: OTA Update Trigger --- */
     lv_obj_t *card_ota = lv_obj_create(scroll);
@@ -860,24 +1017,23 @@ void ui_screen_dashboard_init(lv_obj_t *scr) {
     // Daily Questions Count Center: "שאלות היום: X"
     lv_obj_t *lbl_today = lv_label_create(hud);
     char today_buf[48];
-    snprintf(today_buf, sizeof(today_buf), "שאלות היום: %u", (unsigned int)questions_today);
+    snprintf(today_buf, sizeof(today_buf), "שאלות: %u 🎯", (unsigned int)questions_today);
     lv_label_set_text(lbl_today, today_buf);
     lv_obj_set_style_text_font(lbl_today, &lv_font_hebrew_16, LV_PART_MAIN);
     lv_obj_set_style_text_color(lbl_today, lv_color_hex(0x38BDF8), LV_PART_MAIN); // Radiant Sky Blue
     lv_obj_set_style_base_dir(lbl_today, LV_BASE_DIR_RTL, LV_PART_MAIN);
-    
-    #if BSP_OTA_ENABLED
-    // OTA button
-    lv_obj_t *ota_btn = lv_button_create(hud);
-    lv_obj_set_size(ota_btn, 42, 35);
-    lv_obj_set_style_bg_color(ota_btn, lv_color_hex(0x0284C7), LV_PART_MAIN); // Sky Blue
-    lv_obj_set_style_radius(ota_btn, 8, LV_PART_MAIN);
-    lv_obj_add_event_cb(ota_btn, on_ota_button_clicked, LV_EVENT_CLICKED, NULL);
-    lv_obj_t *ota_lbl = lv_label_create(ota_btn);
-    lv_label_set_text(ota_lbl, "OTA");
-    lv_obj_set_style_text_font(ota_lbl, &lv_font_hebrew_16, LV_PART_MAIN);
-    lv_obj_center(ota_lbl);
-    #endif
+
+    // Battery indicator in HUD
+    lv_obj_t *lbl_bat = lv_label_create(hud);
+    char bat_buf[32];
+    uint8_t bat_pct = hal_battery_get_percentage();
+    snprintf(bat_buf, sizeof(bat_buf), "%s %u%%", hal_battery_get_icon(), (unsigned)bat_pct);
+    lv_label_set_text(lbl_bat, bat_buf);
+    lv_obj_set_style_text_font(lbl_bat, &lv_font_hebrew_16, LV_PART_MAIN);
+    lv_obj_set_style_text_color(lbl_bat, lv_color_hex(hal_battery_is_charging() ? 0x38BDF8 : (bat_pct > 20 ? 0x10B981 : 0xEF4444)), LV_PART_MAIN);
+    s_active_hud_bat_lbl = lbl_bat;
+    s_active_hud_today_lbl = lbl_today;
+
 
     /* Back to Profiles Button in HUD */
     lv_obj_t *back_btn = lv_button_create(hud);
@@ -957,7 +1113,58 @@ void ui_screen_dashboard_init(lv_obj_t *scr) {
         lv_obj_set_style_text_font(play_lbl, &lv_font_hebrew_24, LV_PART_MAIN);
         lv_obj_center(play_lbl);
     }
+
+    /* ---------------------------------------------------------------------- */
+    /* 3. Card 5: System & Settings Category ("מערכת והגדרות ⚙️")             */
+    /* ---------------------------------------------------------------------- */
+    lv_obj_t *sys_card = lv_obj_create(scroll);
+    theme_apply_card(sys_card);
+    lv_obj_set_size(sys_card, 290, 110);
+    lv_obj_set_style_border_color(sys_card, lv_color_hex(0x38BDF8), LV_PART_MAIN);
+    lv_obj_remove_flag(sys_card, LV_OBJ_FLAG_SCROLLABLE);
+
+    // Emoji
+    lv_obj_t *sys_emoji = lv_label_create(sys_card);
+    lv_label_set_text(sys_emoji, "⚙️");
+    lv_obj_set_style_text_font(sys_emoji, &lv_font_hebrew_24, LV_PART_MAIN);
+    lv_obj_align(sys_emoji, LV_ALIGN_TOP_LEFT, 0, 0);
+
+    // Title
+    lv_obj_t *sys_title = lv_label_create(sys_card);
+    lv_label_set_text(sys_title, "מערכת ועדכונים");
+    lv_obj_set_style_text_font(sys_title, &lv_font_hebrew_24, LV_PART_MAIN);
+    lv_obj_set_style_text_color(sys_title, lv_color_hex(0x38BDF8), LV_PART_MAIN);
+    lv_obj_set_style_base_dir(sys_title, LV_BASE_DIR_RTL, LV_PART_MAIN);
+    lv_obj_align(sys_title, LV_ALIGN_TOP_RIGHT, 0, 0);
+
+    // Subtitle with real battery & wifi info
+    lv_obj_t *sys_info = lv_label_create(sys_card);
+    char sys_buf[64];
+    char bat_stat[32];
+    hal_battery_get_status_text(bat_stat, sizeof(bat_stat));
+    snprintf(sys_buf, sizeof(sys_buf), "%s | %s",
+             bat_stat,
+             WiFi.status() == WL_CONNECTED ? "רשת ✅" : "רשת ❌");
+    lv_label_set_text(sys_info, sys_buf);
+    lv_obj_set_style_text_font(sys_info, &lv_font_hebrew_16, LV_PART_MAIN);
+    lv_obj_set_style_text_color(sys_info, lv_color_hex(0x94A3B8), LV_PART_MAIN);
+    lv_obj_set_style_base_dir(sys_info, LV_BASE_DIR_RTL, LV_PART_MAIN);
+    lv_obj_align(sys_info, LV_ALIGN_TOP_RIGHT, 0, 30);
+
+    // Action button to open System / OTA screen
+    lv_obj_t *sys_btn = lv_button_create(sys_card);
+    theme_apply_btn_main(sys_btn);
+    lv_obj_set_size(sys_btn, 140, 38);
+    lv_obj_align(sys_btn, LV_ALIGN_BOTTOM_MID, 0, 0);
+    lv_obj_set_style_bg_color(sys_btn, lv_color_hex(0x0284C7), LV_PART_MAIN);
+    lv_obj_add_event_cb(sys_btn, on_system_card_clicked, LV_EVENT_CLICKED, NULL);
+
+    lv_obj_t *sys_btn_lbl = lv_label_create(sys_btn);
+    lv_label_set_text(sys_btn_lbl, "הגדרות ו-OTA 🚀");
+    lv_obj_set_style_text_font(sys_btn_lbl, &lv_font_hebrew_16, LV_PART_MAIN);
+    lv_obj_center(sys_btn_lbl);
 }
+
 
 /* ========================================================================== */
 /*                         SCREEN BUILDER: SPLASH                             */
@@ -1005,6 +1212,13 @@ void sm_load_screen(ScreenID_t screen_id) {
     ota_pct_lbl = NULL;
     ota_progress_bar = NULL;
     ota_close_btn = NULL;
+
+    // Reset active UI handles so the telemetry timer won't reference freed widgets
+    s_active_hud_bat_lbl = NULL;
+    s_active_hud_today_lbl = NULL;
+    s_active_sys_bat_bar = NULL;
+    s_active_sys_bat_info = NULL;
+    s_active_sys_wifi_info = NULL;
 
     // 1. Create fresh screen object in PSRAM
     lv_obj_t *new_scr = lv_obj_create(NULL);

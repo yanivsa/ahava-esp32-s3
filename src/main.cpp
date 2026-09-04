@@ -14,6 +14,7 @@
 #include "player_data.h"
 #include "audio_manager.h"
 #include "ota_manager.h"
+#include "hal_battery.h"
 #include "esp_heap_caps.h"
 
 /**
@@ -27,13 +28,17 @@ static void background_telemetry_task(void *pvParameters) {
         vTaskDelay(pdMS_TO_TICKS(5000));
         uptime_sec += 5;
 
-        Serial.printf("[TELEMETRY] Uptime: %us | Active Profile: %d | Free SRAM: %u KB | Free PSRAM: %u KB\n",
+        Serial.printf("[TELEMETRY] Uptime: %us | Profile: %d | Bat: %u mV (%u%%, %s) | Free SRAM: %u KB | Free PSRAM: %u KB\n",
                       uptime_sec,
                       (int)current_profile,
+                      hal_battery_get_voltage_mv(),
+                      hal_battery_get_percentage(),
+                      hal_battery_is_charging() ? "CHG" : "BAT",
                       (unsigned int)(heap_caps_get_free_size(MALLOC_CAP_INTERNAL) / 1024),
                       (unsigned int)(heap_caps_get_free_size(MALLOC_CAP_SPIRAM) / 1024));
     }
 }
+
 
 void setup() {
     Serial.begin(115200);
@@ -70,6 +75,10 @@ void setup() {
         Serial.println("[SYS] WARN: NVS initialization encountered an issue.");
     }
 
+    // 2.1. Initialize Hardware Battery & Power Monitor (GPIO 6 / GPIO 7)
+    hal_battery_init();
+
+
     // 3. Initialize I2S Audio Synthesizer on Core 0
     #if BSP_AUDIO_ENABLED
         if (!audio_manager_init()) {
@@ -83,6 +92,9 @@ void setup() {
     #if BSP_OTA_ENABLED
         if (!ota_manager_init()) {
             Serial.println("[SYS] WARN: OTA manager initialization failed.");
+        } else {
+            // Configure Israel timezone (IST-2IDT) and SNTP time sync
+            player_data_sync_time();
         }
     #else
         Serial.println("[SYS] Wi-Fi/OTA disabled until a trusted update endpoint is provisioned.");
