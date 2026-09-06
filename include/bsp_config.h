@@ -58,13 +58,19 @@ extern "C" {
 #define BSP_LCD_BL_PWM_RES_BITS    8
 #define BSP_LCD_BL_DEFAULT_DUTY    0    // MAX35 uses a P-channel high-side switch (active-low)
 
+#define FIRMWARE_VERSION           "v1.3.0"
+
 /* ========================================================================== */
 /*                         I2S AUDIO DAC CONFIGURATION                        */
 /* ========================================================================== */
 #define BSP_I2S_NUM                I2S_NUM_0
-#define BSP_I2S_BCLK_PIN           4    // Bit Clock (BCLK) - safe GPIO
-#define BSP_I2S_LRC_PIN            5    // Word Select / Left-Right Clock (WS/LRC)
-#define BSP_I2S_DOUT_PIN           16   // Serial Data Output (DOUT)
+#define BSP_I2S_MCLK_PIN           16   // Master Clock (MCLK)
+#define BSP_I2S_BCLK_PIN           9    // Bit Clock (BCLK / SCLK)
+#define BSP_I2S_LRC_PIN            45   // Word Select / Left-Right Clock (WS / LRCK)
+#define BSP_I2S_DOUT_PIN           8    // Serial Data Output to ES8311 (DSDIN)
+#define BSP_I2S_DIN_PIN            10   // Serial Data Input from ES8311 (ASDOUT)
+#define BSP_PA_PIN                 43   // NS4150B Power Amplifier Enable (Active HIGH)
+#define BSP_ES8311_I2C_ADDR        0x18 // ES8311 I2C Address (CE pin to GND)
 #define BSP_I2S_SAMPLE_RATE        16000
 #define BSP_AUDIO_ENABLED          1    // I2S Audio synthesizer & Hebrew TTS playback
 #define BSP_OTA_ENABLED            1    // Wi-Fi is provisioned at runtime; firmware is fetched over verified HTTPS

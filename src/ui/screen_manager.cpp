@@ -71,6 +71,8 @@ static lv_obj_t *s_active_hud_today_lbl = NULL;
 static lv_obj_t *s_active_sys_bat_bar = NULL;
 static lv_obj_t *s_active_sys_bat_info = NULL;
 static lv_obj_t *s_active_sys_wifi_info = NULL;
+static lv_obj_t *s_active_sys_vol_lbl = NULL;
+static lv_obj_t *s_active_sys_vol_slider = NULL;
 static lv_timer_t *s_live_status_timer = NULL;
 
 static void ui_live_status_timer_cb(lv_timer_t *timer) {
@@ -783,8 +785,40 @@ static void on_system_back_clicked(lv_event_t *e) {
 }
 
 
+static void on_volume_slider_changed(lv_event_t *e) {
+    lv_obj_t *slider = (lv_obj_t *)lv_event_get_target(e);
+    uint8_t val = (uint8_t)lv_slider_get_value(slider);
+    audio_set_volume(val);
+    if (s_active_sys_vol_lbl && lv_obj_is_valid(s_active_sys_vol_lbl)) {
+        char vol_buf[32];
+        snprintf(vol_buf, sizeof(vol_buf), "עוצמה: %u%%", (unsigned)val);
+        lv_label_set_text(s_active_sys_vol_lbl, vol_buf);
+    }
+}
+
+static void on_volume_btn_step(lv_event_t *e) {
+    if (lv_event_get_code(e) == LV_EVENT_CLICKED) {
+        audio_play_click();
+        int step = (int)(intptr_t)lv_event_get_user_data(e);
+        int current = (int)audio_get_volume();
+        int next = current + step;
+        if (next < 0) next = 0;
+        if (next > 100) next = 100;
+        audio_set_volume((uint8_t)next);
+        if (s_active_sys_vol_slider && lv_obj_is_valid(s_active_sys_vol_slider)) {
+            lv_slider_set_value(s_active_sys_vol_slider, next, LV_ANIM_OFF);
+        }
+        if (s_active_sys_vol_lbl && lv_obj_is_valid(s_active_sys_vol_lbl)) {
+            char vol_buf[32];
+            snprintf(vol_buf, sizeof(vol_buf), "עוצמה: %u%%", (unsigned)next);
+            lv_label_set_text(s_active_sys_vol_lbl, vol_buf);
+        }
+    }
+}
+
 static void on_test_audio_clicked(lv_event_t *e) {
     if (lv_event_get_code(e) == LV_EVENT_CLICKED) {
+        audio_play_click();
         audio_play_voice_success();
     }
 }
@@ -897,8 +931,8 @@ void ui_screen_system_init(lv_obj_t *scr) {
 
     lv_obj_t *fw_date = lv_label_create(card_fw);
     char date_buf[96];
-    snprintf(date_buf, sizeof(date_buf), "תאריך בנייה: %s %s\nמאגר שאלות: %u שאלות מוטמעות",
-             __DATE__, __TIME__, (unsigned)quiz_get_total_questions());
+    snprintf(date_buf, sizeof(date_buf), "גרסה: %s | תאריך: %s %s\nמאגר שאלות: %u שאלות מוטמעות",
+             FIRMWARE_VERSION, __DATE__, __TIME__, (unsigned)quiz_get_total_questions());
     lv_label_set_text(fw_date, date_buf);
     lv_obj_set_style_text_font(fw_date, &lv_font_hebrew_16, LV_PART_MAIN);
     lv_obj_set_style_text_color(fw_date, lv_color_hex(0xE2E8F0), LV_PART_MAIN);
@@ -959,22 +993,85 @@ void ui_screen_system_init(lv_obj_t *scr) {
     lv_obj_set_style_text_font(btn_ota_lbl, &lv_font_hebrew_16, LV_PART_MAIN);
     lv_obj_center(btn_ota_lbl);
 
-    /* --- Card 4: Audio Speaker Test --- */
+    /* --- Card 4: Audio Volume & Speaker Test --- */
     lv_obj_t *card_snd = lv_obj_create(scroll);
     theme_apply_card(card_snd);
-    lv_obj_set_size(card_snd, 296, 95);
+    lv_obj_set_size(card_snd, 296, 175);
     lv_obj_set_style_border_color(card_snd, lv_color_hex(0xA855F7), LV_PART_MAIN);
     lv_obj_remove_flag(card_snd, LV_OBJ_FLAG_SCROLLABLE);
 
+    // Title on Right
+    lv_obj_t *snd_title = lv_label_create(card_snd);
+    lv_label_set_text(snd_title, "🔊 עוצמת קול ושמע:");
+    lv_obj_set_style_text_font(snd_title, &lv_font_hebrew_24, LV_PART_MAIN);
+    lv_obj_set_style_text_color(snd_title, lv_color_hex(0xC084FC), LV_PART_MAIN);
+    lv_obj_set_style_base_dir(snd_title, LV_BASE_DIR_RTL, LV_PART_MAIN);
+    lv_obj_align(snd_title, LV_ALIGN_TOP_RIGHT, 0, 0);
+
+    // Volume Percentage Label
+    lv_obj_t *vol_lbl = lv_label_create(card_snd);
+    char vol_buf[32];
+    snprintf(vol_buf, sizeof(vol_buf), "עוצמה: %u%%", (unsigned)audio_get_volume());
+    lv_label_set_text(vol_lbl, vol_buf);
+    lv_obj_set_style_text_font(vol_lbl, &lv_font_hebrew_16, LV_PART_MAIN);
+    lv_obj_set_style_text_color(vol_lbl, lv_color_hex(0xE2E8F0), LV_PART_MAIN);
+    lv_obj_set_style_base_dir(vol_lbl, LV_BASE_DIR_RTL, LV_PART_MAIN);
+    lv_obj_align(vol_lbl, LV_ALIGN_TOP_RIGHT, 0, 32);
+    s_active_sys_vol_lbl = vol_lbl;
+
+    // Controls container (Row with [-], Slider, [+])
+    lv_obj_t *vol_row = lv_obj_create(card_snd);
+    lv_obj_set_size(vol_row, 270, 42);
+    lv_obj_align(vol_row, LV_ALIGN_TOP_MID, 0, 58);
+    lv_obj_set_style_bg_opa(vol_row, LV_OPA_TRANSP, LV_PART_MAIN);
+    lv_obj_set_style_border_width(vol_row, 0, LV_PART_MAIN);
+    lv_obj_set_style_pad_all(vol_row, 0, LV_PART_MAIN);
+    lv_obj_remove_flag(vol_row, LV_OBJ_FLAG_SCROLLABLE);
+
+    // Minus button
+    lv_obj_t *btn_minus = lv_button_create(vol_row);
+    lv_obj_set_size(btn_minus, 38, 38);
+    lv_obj_align(btn_minus, LV_ALIGN_LEFT_MID, 0, 0);
+    lv_obj_set_style_bg_color(btn_minus, lv_color_hex(0x475569), LV_PART_MAIN);
+    lv_obj_set_style_radius(btn_minus, 8, LV_PART_MAIN);
+    lv_obj_add_event_cb(btn_minus, on_volume_btn_step, LV_EVENT_CLICKED, (void*)(intptr_t)-10);
+    lv_obj_t *lbl_minus = lv_label_create(btn_minus);
+    lv_label_set_text(lbl_minus, "➖");
+    lv_obj_center(lbl_minus);
+
+    // Slider
+    lv_obj_t *vol_slider = lv_slider_create(vol_row);
+    lv_obj_set_size(vol_slider, 175, 16);
+    lv_obj_align(vol_slider, LV_ALIGN_CENTER, 0, 0);
+    lv_slider_set_range(vol_slider, 0, 100);
+    lv_slider_set_value(vol_slider, audio_get_volume(), LV_ANIM_OFF);
+    lv_obj_set_style_bg_color(vol_slider, lv_color_hex(0x1E293B), LV_PART_MAIN);
+    lv_obj_set_style_bg_color(vol_slider, lv_color_hex(0x8B5CF6), LV_PART_INDICATOR);
+    lv_obj_set_style_bg_color(vol_slider, lv_color_hex(0xC4B5FD), LV_PART_KNOB);
+    lv_obj_add_event_cb(vol_slider, on_volume_slider_changed, LV_EVENT_VALUE_CHANGED, NULL);
+    s_active_sys_vol_slider = vol_slider;
+
+    // Plus button
+    lv_obj_t *btn_plus = lv_button_create(vol_row);
+    lv_obj_set_size(btn_plus, 38, 38);
+    lv_obj_align(btn_plus, LV_ALIGN_RIGHT_MID, 0, 0);
+    lv_obj_set_style_bg_color(btn_plus, lv_color_hex(0x475569), LV_PART_MAIN);
+    lv_obj_set_style_radius(btn_plus, 8, LV_PART_MAIN);
+    lv_obj_add_event_cb(btn_plus, on_volume_btn_step, LV_EVENT_CLICKED, (void*)(intptr_t)+10);
+    lv_obj_t *lbl_plus = lv_label_create(btn_plus);
+    lv_label_set_text(lbl_plus, "➕");
+    lv_obj_center(lbl_plus);
+
+    // Test Audio Button
     lv_obj_t *snd_btn = lv_button_create(card_snd);
     theme_apply_btn_main(snd_btn);
-    lv_obj_set_size(snd_btn, 240, 42);
+    lv_obj_set_size(snd_btn, 260, 40);
     lv_obj_set_style_bg_color(snd_btn, lv_color_hex(0x7C3AED), LV_PART_MAIN);
-    lv_obj_center(snd_btn);
+    lv_obj_align(snd_btn, LV_ALIGN_BOTTOM_MID, 0, 0);
     lv_obj_add_event_cb(snd_btn, on_test_audio_clicked, LV_EVENT_CLICKED, NULL);
 
     lv_obj_t *snd_lbl = lv_label_create(snd_btn);
-    lv_label_set_text(snd_lbl, "🔊 בדיקת קול עברי (\"כל הכבוד\")");
+    lv_label_set_text(snd_lbl, "בדיקת קול (כל הכבוד! 🎉)");
     lv_obj_set_style_text_font(snd_lbl, &lv_font_hebrew_16, LV_PART_MAIN);
     lv_obj_center(snd_lbl);
 }
@@ -1219,6 +1316,8 @@ void sm_load_screen(ScreenID_t screen_id) {
     s_active_sys_bat_bar = NULL;
     s_active_sys_bat_info = NULL;
     s_active_sys_wifi_info = NULL;
+    s_active_sys_vol_lbl = NULL;
+    s_active_sys_vol_slider = NULL;
 
     // 1. Create fresh screen object in PSRAM
     lv_obj_t *new_scr = lv_obj_create(NULL);

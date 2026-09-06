@@ -1,18 +1,15 @@
-/**
- * @file audio_manager.cpp
- * @brief Wizard Academy I2S Audio Synthesizer & FreeRTOS Non-Blocking Task
- */
-
 #include "audio_manager.h"
 #include "bsp_config.h"
 #include "voice_assets.h"
 #include <Arduino.h>
+#include <Wire.h>
 #include <math.h>
 #include <string.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/queue.h"
 #include "driver/i2s.h"
+#include "driver/gpio.h"
 
 /* Audio Command Queue Definitions */
 typedef enum {
@@ -30,7 +27,7 @@ typedef struct {
 
 static QueueHandle_t audio_queue = NULL;
 static TaskHandle_t audio_task_handle = NULL;
-static uint8_t master_volume = 25; // Gentle 25% default volume (study-friendly)
+static uint8_t master_volume = 75; // 75% default volume (clear & audible for children)
 
 /* ========================================================================== */
 /*                         SYNTHESIS & I2S PLAYBACK                           */
@@ -188,18 +185,94 @@ static void audio_task_worker(void *pvParameters) {
 }
 
 /* ========================================================================== */
+/*                         ES8311 HARDWARE CODEC DRIVER                       */
+/* ========================================================================== */
+
+static bool es8311_write_reg(uint8_t reg, uint8_t val) {
+    Wire.beginTransmission((uint8_t)BSP_ES8311_I2C_ADDR);
+    Wire.write(reg);
+    Wire.write(val);
+    return (Wire.endTransmission() == 0);
+}
+
+static uint8_t es8311_read_reg(uint8_t reg) {
+    Wire.beginTransmission((uint8_t)BSP_ES8311_I2C_ADDR);
+    Wire.write(reg);
+    if (Wire.endTransmission(false) != 0) return 0;
+    if (Wire.requestFrom((uint8_t)BSP_ES8311_I2C_ADDR, (size_t)1) != 1) return 0;
+    return Wire.read();
+}
+
+static bool es8311_hardware_init(uint8_t init_vol_pct) {
+    // Probe ES8311 presence on the shared I2C bus
+    Wire.beginTransmission((uint8_t)BSP_ES8311_I2C_ADDR);
+    if (Wire.endTransmission() != 0) {
+        Serial.printf("[AUDIO] ES8311 Codec not responding at I2C 0x%02X!\n", BSP_ES8311_I2C_ADDR);
+        return false;
+    }
+
+    uint8_t id1 = es8311_read_reg(0xFD);
+    uint8_t id2 = es8311_read_reg(0xFE);
+    Serial.printf("[AUDIO] Found ES8311 Codec (Chip ID: 0x%02X 0x%02X)\n", id1, id2);
+
+    // 1. Reset sequence
+    es8311_write_reg(0x00, 0x1F); // Reset digital blocks
+    delay(20);
+    es8311_write_reg(0x00, 0x00);
+    es8311_write_reg(0x00, 0x80); // Release reset, power on CSM
+
+    // 2. Clock configuration: internal MCLK from MCLK pin (GPIO 16)
+    es8311_write_reg(0x01, 0x3F); // Enable all clock gates, MCLK pin input
+    es8311_write_reg(0x02, 0x00); // pre_div=1, pre_multi=1
+    es8311_write_reg(0x03, 0x10); // fs_mode=0, adc_osr=16
+    es8311_write_reg(0x04, 0x10); // dac_osr=16
+    es8311_write_reg(0x05, 0x00); // adc_div=1, dac_div=1
+    es8311_write_reg(0x06, 0x04); // bclk_div=4
+    es8311_write_reg(0x07, 0x00); // lrck_h=0
+    es8311_write_reg(0x08, 0xFF); // lrck_l=255
+
+    // 3. Serial data port format: 16-bit I2S Slave
+    es8311_write_reg(0x09, 0x0C); // 16-bit SDP In (DAC)
+    es8311_write_reg(0x0A, 0x0C); // 16-bit SDP Out (ADC)
+
+    // 4. Power up analog circuitry & DAC
+    es8311_write_reg(0x0D, 0x01); // Power up analog circuitry
+    es8311_write_reg(0x0E, 0x02); // Enable analog PGA, enable ADC modulator
+    es8311_write_reg(0x12, 0x00); // Power up DAC
+    es8311_write_reg(0x13, 0x10); // Enable output to HP/Line drive
+    es8311_write_reg(0x1C, 0x6A); // ADC Equalizer bypass
+    es8311_write_reg(0x37, 0x08); // Bypass DAC equalizer
+
+    // 5. Set DAC Volume & Unmute
+    uint8_t dac_vol = (uint8_t)(((uint32_t)init_vol_pct * 255) / 100);
+    es8311_write_reg(0x32, dac_vol);
+    es8311_write_reg(0x31, 0x00); // Unmute DAC
+
+    Serial.printf("[AUDIO] ES8311 initialized successfully (Hardware DAC Volume: %u%% / reg32=0x%02X)\n",
+                  init_vol_pct, dac_vol);
+    return true;
+}
+
+/* ========================================================================== */
 /*                         PUBLIC API IMPLEMENTATION                          */
 /* ========================================================================== */
 
 bool audio_manager_init(void) {
-    // 1. Create Command Queue
+    // 1. Initialize NS4150B Power Amplifier control pin (GPIO 43)
+    pinMode(BSP_PA_PIN, OUTPUT);
+    digitalWrite(BSP_PA_PIN, LOW); // Hold in shutdown during boot to prevent clicks
+
+    // 2. Ensure I2C bus is initialized for ES8311 codec
+    Wire.begin(BSP_TOUCH_I2C_SDA_PIN, BSP_TOUCH_I2C_SCL_PIN, 400000);
+
+    // 3. Create Command Queue
     audio_queue = xQueueCreate(10, sizeof(AudioMsg_t));
     if (!audio_queue) {
         Serial.println("[AUDIO] ERROR: Failed to create audio queue!");
         return false;
     }
 
-    // 2. Configure I2S Driver (Legacy standard ESP-IDF)
+    // 4. Configure I2S Driver (Legacy standard ESP-IDF)
     i2s_config_t i2s_config = {
         .mode = (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_TX),
         .sample_rate = BSP_I2S_SAMPLE_RATE,
@@ -211,14 +284,15 @@ bool audio_manager_init(void) {
         .dma_buf_len = 256,
         .use_apll = false,
         .tx_desc_auto_clear = true,
-        .fixed_mclk = 0
+        .fixed_mclk = BSP_I2S_SAMPLE_RATE * 256
     };
 
     i2s_pin_config_t pin_config = {
-        .bck_io_num = BSP_I2S_BCLK_PIN,
-        .ws_io_num = BSP_I2S_LRC_PIN,
-        .data_out_num = BSP_I2S_DOUT_PIN,
-        .data_in_num = I2S_PIN_NO_CHANGE
+        .mck_io_num = BSP_I2S_MCLK_PIN, // GPIO 16 (MCLK to ES8311)
+        .bck_io_num = BSP_I2S_BCLK_PIN, // GPIO 9 (SCLK/BCLK)
+        .ws_io_num = BSP_I2S_LRC_PIN,   // GPIO 45 (LRCK/WS)
+        .data_out_num = BSP_I2S_DOUT_PIN, // GPIO 8 (DSDIN/DOUT)
+        .data_in_num = BSP_I2S_DIN_PIN    // GPIO 10 (ASDOUT/DIN)
     };
 
     esp_err_t err = i2s_driver_install(BSP_I2S_NUM, &i2s_config, 0, NULL);
@@ -235,7 +309,16 @@ bool audio_manager_init(void) {
 
     i2s_zero_dma_buffer(BSP_I2S_NUM);
 
-    // 3. Launch Audio Task pinned to Core 0
+    // 5. Initialize ES8311 Hardware Codec via I2C
+    if (!es8311_hardware_init(master_volume)) {
+        Serial.println("[AUDIO] WARN: ES8311 codec initialization was not confirmed.");
+    }
+
+    // 6. Enable NS4150B Power Amplifier (GPIO 43 HIGH)
+    digitalWrite(BSP_PA_PIN, HIGH);
+    Serial.printf("[AUDIO] NS4150B Power Amplifier enabled on GPIO %d\n", BSP_PA_PIN);
+
+    // 7. Launch Audio Task pinned to Core 0
     BaseType_t task_status = xTaskCreatePinnedToCore(
         audio_task_worker,
         BSP_AUDIO_TASK_NAME,
@@ -251,8 +334,8 @@ bool audio_manager_init(void) {
         return false;
     }
 
-    Serial.printf("[AUDIO] I2S initialized on BCLK=%d, LRC=%d, DOUT=%d (SampleRate: %d Hz)\n",
-                  BSP_I2S_BCLK_PIN, BSP_I2S_LRC_PIN, BSP_I2S_DOUT_PIN, BSP_I2S_SAMPLE_RATE);
+    Serial.printf("[AUDIO] I2S initialized on MCLK=%d, BCLK=%d, LRC=%d, DOUT=%d, PA=%d (SampleRate: %d Hz)\n",
+                  BSP_I2S_MCLK_PIN, BSP_I2S_BCLK_PIN, BSP_I2S_LRC_PIN, BSP_I2S_DOUT_PIN, BSP_PA_PIN, BSP_I2S_SAMPLE_RATE);
     return true;
 }
 
@@ -312,4 +395,19 @@ bool audio_play_voice_prompt(const char *prompt_text) {
 void audio_set_volume(uint8_t volume_pct) {
     if (volume_pct > 100) volume_pct = 100;
     master_volume = volume_pct;
+
+    if (volume_pct == 0) {
+        // Mute amplifier and DAC
+        digitalWrite(BSP_PA_PIN, LOW);
+        es8311_write_reg(0x31, 0x60); // Mute DAC
+    } else {
+        uint8_t dac_vol = (uint8_t)(((uint32_t)volume_pct * 255) / 100);
+        es8311_write_reg(0x32, dac_vol);
+        es8311_write_reg(0x31, 0x00); // Unmute DAC
+        digitalWrite(BSP_PA_PIN, HIGH);
+    }
+}
+
+uint8_t audio_get_volume(void) {
+    return master_volume;
 }

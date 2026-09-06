@@ -60,6 +60,11 @@ bool audio_play_voice_prompt(const char *prompt_text);
  */
 void audio_set_volume(uint8_t volume_pct);
 
+/**
+ * @brief Get master volume percentage (0 - 100).
+ */
+uint8_t audio_get_volume(void);
+
 #ifdef __cplusplus
 }
 #endif
