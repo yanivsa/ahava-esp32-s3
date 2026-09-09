@@ -87,9 +87,31 @@ static bool valid_subject(int subject_id) {
     return subject_id >= 0 && subject_id < 4;
 }
 
+static uint32_t saturating_add(uint32_t a, uint32_t b) {
+    return (UINT32_MAX - a < b) ? UINT32_MAX : a + b;
+}
+
 static void make_subject_key(char *buf, size_t len, const char *prefix,
                              WizardProfile_t profile, int subject_id) {
     snprintf(buf, len, "%s%d_%d", prefix, (int)profile, subject_id);
+}
+
+static void clear_unsynced_counts(WizardProfile_t profile) {
+    char key[16];
+    for (int subject = 0; subject < 4; ++subject) {
+        make_subject_key(key, sizeof(key), "uq", profile, subject);
+        nvs_write_u32_val(key, 0);
+    }
+}
+
+static uint32_t get_unsynced_total(WizardProfile_t profile) {
+    char key[16];
+    uint32_t total = 0;
+    for (int subject = 0; subject < 4; ++subject) {
+        make_subject_key(key, sizeof(key), "uq", profile, subject);
+        total = saturating_add(total, nvs_read_u32_val(key, 0));
+    }
+    return total;
 }
 
 static void reset_daily_counts(WizardProfile_t profile, uint32_t today) {
@@ -105,24 +127,63 @@ static void reset_daily_counts(WizardProfile_t profile, uint32_t today) {
         make_subject_key(key, sizeof(key), "qs", profile, subject);
         nvs_write_u32_val(key, 0);
     }
+    clear_unsynced_counts(profile);
 
     Serial.printf("[NVS] Profile %d: new valid day %u -> daily counters reset.\n",
                   (int)profile, today);
 }
 
-static void ensure_daily_bucket(WizardProfile_t profile) {
-    if (!valid_profile(profile)) return;
+static void restore_unsynced_counts_for_date(WizardProfile_t profile, uint32_t today) {
+    char key[16];
+    uint32_t total = 0;
 
-    const uint32_t today = player_data_get_current_date();
-    if (today == 0) {
-        // No trusted date yet: keep the last persisted counters unchanged.
-        return;
+    for (int subject = 0; subject < 4; ++subject) {
+        make_subject_key(key, sizeof(key), "uq", profile, subject);
+        const uint32_t unsynced = nvs_read_u32_val(key, 0);
+
+        make_subject_key(key, sizeof(key), "qs", profile, subject);
+        nvs_write_u32_val(key, unsynced);
+        total = saturating_add(total, unsynced);
     }
+
+    snprintf(key, sizeof(key), "qt_%d", (int)profile);
+    nvs_write_u32_val(key, total);
+    snprintf(key, sizeof(key), "d_%d", (int)profile);
+    nvs_write_u32_val(key, today);
+    clear_unsynced_counts(profile);
+
+    Serial.printf("[NVS] Profile %d: trusted date %u adopted; preserved %u unsynced counted questions.\n",
+                  (int)profile, today, (unsigned)total);
+}
+
+static void ensure_daily_bucket_for_date(WizardProfile_t profile, uint32_t today) {
+    if (!valid_profile(profile) || today == 0) return;
 
     char date_key[16];
     snprintf(date_key, sizeof(date_key), "d_%d", (int)profile);
     const uint32_t saved_date = nvs_read_u32_val(date_key, 0);
-    if (saved_date != today) reset_daily_counts(profile, today);
+    const uint32_t unsynced_total = get_unsynced_total(profile);
+    const QuizDailyBucketAction_t action = quiz_policy_daily_bucket_action(
+        today, saved_date, unsynced_total > 0);
+
+    if (action == QUIZ_DAILY_RESET) {
+        reset_daily_counts(profile, today);
+    } else if (action == QUIZ_DAILY_ADOPT_DATE_KEEP_COUNTS) {
+        // The persisted counters may include an older day's activity. Restore
+        // only the eligible questions counted while the clock was untrusted.
+        restore_unsynced_counts_for_date(profile, today);
+    } else if (saved_date == today && unsynced_total > 0) {
+        // The clock came back and confirms the same day. The regular counters
+        // already include the unsynced activity, so only the temporary deltas
+        // need to be cleared.
+        clear_unsynced_counts(profile);
+        Serial.printf("[NVS] Profile %d: trusted date confirms current bucket %u.\n",
+                      (int)profile, today);
+    }
+}
+
+static void ensure_daily_bucket(WizardProfile_t profile) {
+    ensure_daily_bucket_for_date(profile, player_data_get_current_date());
 }
 
 }  // namespace
@@ -161,7 +222,7 @@ void player_data_add_coins(WizardProfile_t profile, uint32_t amount) {
     snprintf(key, sizeof(key), "c_%d", (int)profile);
 
     uint32_t current = nvs_read_u32_val(key, 0);
-    uint32_t next = (UINT32_MAX - current < amount) ? UINT32_MAX : current + amount;
+    uint32_t next = saturating_add(current, amount);
     if (nvs_write_u32_val(key, next)) {
         Serial.printf("[NVS] Profile %d: Added %u coins -> Total: %u 🪙\n",
                       (int)profile, amount, next);
@@ -181,7 +242,7 @@ void player_data_add_xp(WizardProfile_t profile, uint32_t amount) {
     snprintf(key, sizeof(key), "xp_%d", (int)profile);
 
     uint32_t current = nvs_read_u32_val(key, 0);
-    uint32_t next = (UINT32_MAX - current < amount) ? UINT32_MAX : current + amount;
+    uint32_t next = saturating_add(current, amount);
     if (nvs_write_u32_val(key, next)) {
         Serial.printf("[NVS] Profile %d: Added %u XP -> Total: %u ⚡\n",
                       (int)profile, amount, next);
@@ -236,7 +297,9 @@ void player_data_prepare_question_count(WizardProfile_t profile, int subject_id,
 
 uint32_t player_data_increment_questions_today(WizardProfile_t profile) {
     if (!valid_profile(profile)) return 0;
-    ensure_daily_bucket(profile);
+
+    const uint32_t count_date = player_data_get_current_date();
+    ensure_daily_bucket_for_date(profile, count_date);
 
     const bool can_count = pending_count_valid &&
                            pending_count_profile == profile &&
@@ -250,14 +313,18 @@ uint32_t player_data_increment_questions_today(WizardProfile_t profile) {
     pending_count_profile = PROFILE_NONE;
     pending_count_subject = -1;
 
-    uint32_t current_total = player_data_get_questions_today(profile);
+    char total_key[16];
+    snprintf(total_key, sizeof(total_key), "qt_%d", (int)profile);
+    const uint32_t current_total = nvs_read_u32_val(total_key, 0);
     if (!can_count) {
         Serial.printf("[NVS] Profile %d: finalized answer not counted (not first-try correct).\n",
                       (int)profile);
         return current_total;
     }
 
-    const uint32_t subject_count = player_data_get_subject_questions_today(profile, subject_id);
+    char subject_key[16];
+    make_subject_key(subject_key, sizeof(subject_key), "qs", profile, subject_id);
+    const uint32_t subject_count = nvs_read_u32_val(subject_key, 0);
     const uint32_t limit = quiz_policy_daily_limit((int)profile, subject_id);
     if (limit != UINT32_MAX && subject_count >= limit) {
         Serial.printf("[NVS] Profile %d subject %d: daily limit %u already reached.\n",
@@ -265,18 +332,25 @@ uint32_t player_data_increment_questions_today(WizardProfile_t profile) {
         return current_total;
     }
 
-    char total_key[16];
-    snprintf(total_key, sizeof(total_key), "qt_%d", (int)profile);
-    uint32_t next_total = (current_total == UINT32_MAX) ? UINT32_MAX : current_total + 1;
+    if (count_date == 0) {
+        // Track exactly how many eligible answers occurred while the date was
+        // untrusted. If SNTP later reveals a new date, these deltas survive
+        // the rollover instead of being erased or mixed with the old day.
+        char unsynced_key[16];
+        make_subject_key(unsynced_key, sizeof(unsynced_key), "uq", profile, subject_id);
+        const uint32_t unsynced = nvs_read_u32_val(unsynced_key, 0);
+        nvs_write_u32_val(unsynced_key, saturating_add(unsynced, 1));
+    }
+
+    const uint32_t next_total = saturating_add(current_total, 1);
     nvs_write_u32_val(total_key, next_total);
 
-    char subject_key[16];
-    make_subject_key(subject_key, sizeof(subject_key), "qs", profile, subject_id);
-    uint32_t next_subject = (subject_count == UINT32_MAX) ? UINT32_MAX : subject_count + 1;
+    const uint32_t next_subject = saturating_add(subject_count, 1);
     nvs_write_u32_val(subject_key, next_subject);
 
-    Serial.printf("[NVS] Profile %d subject %d: first-try correct -> total=%u subject=%u.\n",
-                  (int)profile, subject_id, (unsigned)next_total, (unsigned)next_subject);
+    Serial.printf("[NVS] Profile %d subject %d: first-try correct -> total=%u subject=%u%s.\n",
+                  (int)profile, subject_id, (unsigned)next_total, (unsigned)next_subject,
+                  count_date == 0 ? " (date unsynced)" : "");
     return next_total;
 }
 
