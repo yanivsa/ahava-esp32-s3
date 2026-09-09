@@ -11,11 +11,13 @@ static inline bool quiz_policy_should_count(bool is_correct, bool hint_used) {
 }
 
 /**
- * Daily subject cap. Profile 1 is Ori and subject 3 is Judaism/Halacha.
- * Other profile/subject combinations remain unlimited.
+ * Ori's daily subject caps: mathematics (subject 0) is unlimited; Hebrew/
+ * language, English, and Judaism/Halacha (subjects 1-3) are capped at 10
+ * counted questions per day. Other profiles remain unlimited.
  */
 static inline uint32_t quiz_policy_daily_limit(int profile, int subject_id) {
-    return (profile == 1 && subject_id == 3) ? 10u : UINT32_MAX;
+    if (profile == 1 && subject_id >= 1 && subject_id <= 3) return 10u;
+    return UINT32_MAX;
 }
 
 typedef enum {
