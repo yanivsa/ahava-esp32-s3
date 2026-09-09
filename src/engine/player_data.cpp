@@ -4,32 +4,39 @@
  */
 
 #include "player_data.h"
+#include "quiz_policy.h"
 #include <Arduino.h>
 #include "nvs_flash.h"
 #include "nvs.h"
 #include "esp_err.h"
 #include <limits.h>
+#include <string.h>
 #include <time.h>
 
 #define NVS_STORAGE_NAMESPACE "wizard_nvs"
 #define ISRAEL_TZ "IST-2IDT,M3.4.4/26,M10.5.0"
+#define RETRY_MAX_QUESTIONS 256
+#define RETRY_WORDS (RETRY_MAX_QUESTIONS / 32)
 
+namespace {
 
-/* ========================================================================== */
-/*                         INTERNAL NVS HELPERS                               */
-/* ========================================================================== */
+struct RetryBits {
+    uint32_t words[RETRY_WORDS];
+};
+
+static bool pending_count_valid = false;
+static bool pending_count_eligible = false;
+static WizardProfile_t pending_count_profile = PROFILE_NONE;
+static int pending_count_subject = -1;
 
 static uint32_t nvs_read_u32_val(const char *key, uint32_t default_val) {
     nvs_handle_t handle;
     esp_err_t err = nvs_open(NVS_STORAGE_NAMESPACE, NVS_READONLY, &handle);
-    if (err != ESP_OK) {
-        return default_val;
-    }
+    if (err != ESP_OK) return default_val;
 
     uint32_t value = default_val;
     err = nvs_get_u32(handle, key, &value);
     nvs_close(handle);
-
     return (err == ESP_OK) ? value : default_val;
 }
 
@@ -42,17 +49,83 @@ static bool nvs_write_u32_val(const char *key, uint32_t val) {
     }
 
     err = nvs_set_u32(handle, key, val);
-    if (err == ESP_OK) {
-        err = nvs_commit(handle);
-    }
+    if (err == ESP_OK) err = nvs_commit(handle);
     nvs_close(handle);
-
-    return (err == ESP_OK);
+    return err == ESP_OK;
 }
 
-/* ========================================================================== */
-/*                         PUBLIC API IMPLEMENTATION                          */
-/* ========================================================================== */
+static bool nvs_read_retry_bits(const char *key, RetryBits *bits) {
+    if (!bits) return false;
+    memset(bits, 0, sizeof(*bits));
+
+    nvs_handle_t handle;
+    esp_err_t err = nvs_open(NVS_STORAGE_NAMESPACE, NVS_READONLY, &handle);
+    if (err != ESP_OK) return false;
+
+    size_t size = sizeof(*bits);
+    err = nvs_get_blob(handle, key, bits, &size);
+    nvs_close(handle);
+    return err == ESP_OK && size == sizeof(*bits);
+}
+
+static bool nvs_write_retry_bits(const char *key, const RetryBits &bits) {
+    nvs_handle_t handle;
+    esp_err_t err = nvs_open(NVS_STORAGE_NAMESPACE, NVS_READWRITE, &handle);
+    if (err != ESP_OK) return false;
+
+    err = nvs_set_blob(handle, key, &bits, sizeof(bits));
+    if (err == ESP_OK) err = nvs_commit(handle);
+    nvs_close(handle);
+    return err == ESP_OK;
+}
+
+static bool valid_profile(WizardProfile_t profile) {
+    return profile > PROFILE_NONE && profile < PROFILE_MAX;
+}
+
+static bool valid_subject(int subject_id) {
+    return subject_id >= 0 && subject_id < 4;
+}
+
+static void make_subject_key(char *buf, size_t len, const char *prefix,
+                             WizardProfile_t profile, int subject_id) {
+    snprintf(buf, len, "%s%d_%d", prefix, (int)profile, subject_id);
+}
+
+static void reset_daily_counts(WizardProfile_t profile, uint32_t today) {
+    char key[16];
+
+    snprintf(key, sizeof(key), "d_%d", (int)profile);
+    nvs_write_u32_val(key, today);
+
+    snprintf(key, sizeof(key), "qt_%d", (int)profile);
+    nvs_write_u32_val(key, 0);
+
+    for (int subject = 0; subject < 4; ++subject) {
+        make_subject_key(key, sizeof(key), "qs", profile, subject);
+        nvs_write_u32_val(key, 0);
+    }
+
+    Serial.printf("[NVS] Profile %d: new valid day %u -> daily counters reset.\n",
+                  (int)profile, today);
+}
+
+static void ensure_daily_bucket(WizardProfile_t profile) {
+    if (!valid_profile(profile)) return;
+
+    const uint32_t today = player_data_get_current_date();
+    if (today == 0) {
+        // No trusted date yet: keep the last persisted counters unchanged.
+        return;
+    }
+
+    char date_key[16];
+    snprintf(date_key, sizeof(date_key), "d_%d", (int)profile);
+    const uint32_t saved_date = nvs_read_u32_val(date_key, 0);
+    if (saved_date != today) reset_daily_counts(profile, today);
+}
+
+}  // namespace
 
 bool player_data_init(void) {
     esp_err_t err = nvs_flash_init();
@@ -76,44 +149,42 @@ bool player_data_init(void) {
 }
 
 uint32_t player_data_get_coins(WizardProfile_t profile) {
-    if (profile <= PROFILE_NONE || profile >= PROFILE_MAX) return 0;
+    if (!valid_profile(profile)) return 0;
     char key[16];
     snprintf(key, sizeof(key), "c_%d", (int)profile);
     return nvs_read_u32_val(key, 0);
 }
 
 void player_data_add_coins(WizardProfile_t profile, uint32_t amount) {
-    if (profile <= PROFILE_NONE || profile >= PROFILE_MAX) return;
+    if (!valid_profile(profile)) return;
     char key[16];
     snprintf(key, sizeof(key), "c_%d", (int)profile);
 
-    uint32_t current_coins = nvs_read_u32_val(key, 0);
-    uint32_t new_coins = (UINT32_MAX - current_coins < amount) ? UINT32_MAX : current_coins + amount;
-
-    if (nvs_write_u32_val(key, new_coins)) {
-        Serial.printf("[NVS] Profile %d: Added %u coins -> Total: %u 🪙\n", 
-                      (int)profile, amount, new_coins);
+    uint32_t current = nvs_read_u32_val(key, 0);
+    uint32_t next = (UINT32_MAX - current < amount) ? UINT32_MAX : current + amount;
+    if (nvs_write_u32_val(key, next)) {
+        Serial.printf("[NVS] Profile %d: Added %u coins -> Total: %u 🪙\n",
+                      (int)profile, amount, next);
     }
 }
 
 uint32_t player_data_get_xp(WizardProfile_t profile) {
-    if (profile <= PROFILE_NONE || profile >= PROFILE_MAX) return 0;
+    if (!valid_profile(profile)) return 0;
     char key[16];
     snprintf(key, sizeof(key), "xp_%d", (int)profile);
     return nvs_read_u32_val(key, 0);
 }
 
 void player_data_add_xp(WizardProfile_t profile, uint32_t amount) {
-    if (profile <= PROFILE_NONE || profile >= PROFILE_MAX) return;
+    if (!valid_profile(profile)) return;
     char key[16];
     snprintf(key, sizeof(key), "xp_%d", (int)profile);
 
-    uint32_t current_xp = nvs_read_u32_val(key, 0);
-    uint32_t new_xp = (UINT32_MAX - current_xp < amount) ? UINT32_MAX : current_xp + amount;
-
-    if (nvs_write_u32_val(key, new_xp)) {
-        Serial.printf("[NVS] Profile %d: Added %u XP -> Total: %u ⚡\n", 
-                      (int)profile, amount, new_xp);
+    uint32_t current = nvs_read_u32_val(key, 0);
+    uint32_t next = (UINT32_MAX - current < amount) ? UINT32_MAX : current + amount;
+    if (nvs_write_u32_val(key, next)) {
+        Serial.printf("[NVS] Profile %d: Added %u XP -> Total: %u ⚡\n",
+                      (int)profile, amount, next);
     }
 }
 
@@ -125,75 +196,131 @@ void player_data_sync_time(void) {
 bool player_data_is_time_synced(void) {
     time_t now = time(NULL);
     struct tm timeinfo;
-    if (localtime_r(&now, &timeinfo) != NULL) {
-        return (timeinfo.tm_year + 1900 >= 2025);
-    }
-    return false;
+    return localtime_r(&now, &timeinfo) != NULL && (timeinfo.tm_year + 1900 >= 2025);
 }
 
 uint32_t player_data_get_current_date(void) {
     time_t now = time(NULL);
     struct tm timeinfo;
     if (localtime_r(&now, &timeinfo) != NULL && (timeinfo.tm_year + 1900 >= 2025)) {
-        return (uint32_t)((timeinfo.tm_year + 1900) * 10000 + (timeinfo.tm_mon + 1) * 100 + timeinfo.tm_mday);
+        return (uint32_t)((timeinfo.tm_year + 1900) * 10000 +
+                          (timeinfo.tm_mon + 1) * 100 + timeinfo.tm_mday);
     }
     return 0;
 }
 
 uint32_t player_data_get_questions_today(WizardProfile_t profile) {
-    if (profile <= PROFILE_NONE || profile >= PROFILE_MAX) return 0;
-    char count_key[16];
-    char date_key[16];
-    snprintf(count_key, sizeof(count_key), "qt_%d", (int)profile);
-    snprintf(date_key, sizeof(date_key), "d_%d", (int)profile);
+    if (!valid_profile(profile)) return 0;
+    ensure_daily_bucket(profile);
 
-    uint32_t today = player_data_get_current_date();
-    if (today > 0) {
-        uint32_t saved_date = nvs_read_u32_val(date_key, 0);
-        if (saved_date != today) {
-            // Day rolled over (midnight passed) or first time run today
-            Serial.printf("[NVS] Profile %d: New day detected (%u vs saved %u). Resetting daily questions to 0.\n",
-                          (int)profile, today, saved_date);
-            nvs_write_u32_val(date_key, today);
-            nvs_write_u32_val(count_key, 0);
-            return 0;
-        }
-    }
-    return nvs_read_u32_val(count_key, 0);
+    char key[16];
+    snprintf(key, sizeof(key), "qt_%d", (int)profile);
+    return nvs_read_u32_val(key, 0);
+}
+
+uint32_t player_data_get_subject_questions_today(WizardProfile_t profile, int subject_id) {
+    if (!valid_profile(profile) || !valid_subject(subject_id)) return 0;
+    ensure_daily_bucket(profile);
+
+    char key[16];
+    make_subject_key(key, sizeof(key), "qs", profile, subject_id);
+    return nvs_read_u32_val(key, 0);
+}
+
+void player_data_prepare_question_count(WizardProfile_t profile, int subject_id, bool eligible) {
+    pending_count_valid = valid_profile(profile) && valid_subject(subject_id);
+    pending_count_profile = profile;
+    pending_count_subject = subject_id;
+    pending_count_eligible = eligible;
 }
 
 uint32_t player_data_increment_questions_today(WizardProfile_t profile) {
-    if (profile <= PROFILE_NONE || profile >= PROFILE_MAX) return 0;
-    char count_key[16];
-    char date_key[16];
-    snprintf(count_key, sizeof(count_key), "qt_%d", (int)profile);
-    snprintf(date_key, sizeof(date_key), "d_%d", (int)profile);
+    if (!valid_profile(profile)) return 0;
+    ensure_daily_bucket(profile);
 
-    uint32_t today = player_data_get_current_date();
-    uint32_t new_count = 1;
+    const bool can_count = pending_count_valid &&
+                           pending_count_profile == profile &&
+                           pending_count_eligible &&
+                           valid_subject(pending_count_subject);
+    const int subject_id = pending_count_subject;
 
-    if (today > 0) {
-        uint32_t saved_date = nvs_read_u32_val(date_key, 0);
-        if (saved_date != today) {
-            // New day
-            nvs_write_u32_val(date_key, today);
-            nvs_write_u32_val(count_key, 1);
-            Serial.printf("[NVS] Profile %d: First question of today (%u) -> count: 1 🎯\n",
-                          (int)profile, today);
-            return 1;
-        }
+    // Consume the gate exactly once, regardless of outcome.
+    pending_count_valid = false;
+    pending_count_eligible = false;
+    pending_count_profile = PROFILE_NONE;
+    pending_count_subject = -1;
+
+    uint32_t current_total = player_data_get_questions_today(profile);
+    if (!can_count) {
+        Serial.printf("[NVS] Profile %d: finalized answer not counted (not first-try correct).\n",
+                      (int)profile);
+        return current_total;
     }
 
-    uint32_t current_count = nvs_read_u32_val(count_key, 0);
-    new_count = current_count + 1;
-    nvs_write_u32_val(count_key, new_count);
-    if (today > 0) {
-        nvs_write_u32_val(date_key, today);
+    const uint32_t subject_count = player_data_get_subject_questions_today(profile, subject_id);
+    const uint32_t limit = quiz_policy_daily_limit((int)profile, subject_id);
+    if (limit != UINT32_MAX && subject_count >= limit) {
+        Serial.printf("[NVS] Profile %d subject %d: daily limit %u already reached.\n",
+                      (int)profile, subject_id, (unsigned)limit);
+        return current_total;
     }
 
-    Serial.printf("[NVS] Profile %d: Answered today count -> %u 🎯 (Date: %u)\n", 
-                  (int)profile, new_count, today);
-    return new_count;
+    char total_key[16];
+    snprintf(total_key, sizeof(total_key), "qt_%d", (int)profile);
+    uint32_t next_total = (current_total == UINT32_MAX) ? UINT32_MAX : current_total + 1;
+    nvs_write_u32_val(total_key, next_total);
+
+    char subject_key[16];
+    make_subject_key(subject_key, sizeof(subject_key), "qs", profile, subject_id);
+    uint32_t next_subject = (subject_count == UINT32_MAX) ? UINT32_MAX : subject_count + 1;
+    nvs_write_u32_val(subject_key, next_subject);
+
+    Serial.printf("[NVS] Profile %d subject %d: first-try correct -> total=%u subject=%u.\n",
+                  (int)profile, subject_id, (unsigned)next_total, (unsigned)next_subject);
+    return next_total;
+}
+
+void player_data_retry_set(WizardProfile_t profile, int subject_id,
+                           uint16_t ordinal, bool pending) {
+    if (!valid_profile(profile) || !valid_subject(subject_id) ||
+        ordinal >= RETRY_MAX_QUESTIONS) return;
+
+    char key[16];
+    make_subject_key(key, sizeof(key), "r", profile, subject_id);
+
+    RetryBits bits{};
+    nvs_read_retry_bits(key, &bits);
+    const uint16_t word = ordinal / 32;
+    const uint8_t bit = ordinal % 32;
+    if (pending) bits.words[word] |= (1u << bit);
+    else bits.words[word] &= ~(1u << bit);
+
+    if (!nvs_write_retry_bits(key, bits)) {
+        Serial.printf("[NVS] WARN: failed to persist retry profile=%d subject=%d ordinal=%u.\n",
+                      (int)profile, subject_id, (unsigned)ordinal);
+    }
+}
+
+int player_data_retry_find_next(WizardProfile_t profile, int subject_id,
+                                uint16_t start_ordinal, uint16_t question_count) {
+    if (!valid_profile(profile) || !valid_subject(subject_id) || question_count == 0) return -1;
+
+    const uint16_t capped_count = question_count > RETRY_MAX_QUESTIONS
+        ? RETRY_MAX_QUESTIONS : question_count;
+    if (start_ordinal >= capped_count) start_ordinal = 0;
+
+    char key[16];
+    make_subject_key(key, sizeof(key), "r", profile, subject_id);
+    RetryBits bits{};
+    if (!nvs_read_retry_bits(key, &bits)) return -1;
+
+    for (uint16_t offset = 0; offset < capped_count; ++offset) {
+        const uint16_t ordinal = (uint16_t)((start_ordinal + offset) % capped_count);
+        const uint16_t word = ordinal / 32;
+        const uint8_t bit = ordinal % 32;
+        if (bits.words[word] & (1u << bit)) return ordinal;
+    }
+    return -1;
 }
 
 void player_data_reset_all(void) {
@@ -202,7 +329,10 @@ void player_data_reset_all(void) {
         nvs_erase_all(handle);
         nvs_commit(handle);
         nvs_close(handle);
+        pending_count_valid = false;
+        pending_count_eligible = false;
+        pending_count_profile = PROFILE_NONE;
+        pending_count_subject = -1;
         Serial.println("[NVS] All wizard profiles reset to 0.");
     }
 }
-
