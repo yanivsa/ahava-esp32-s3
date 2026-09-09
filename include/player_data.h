@@ -13,78 +13,42 @@
 extern "C" {
 #endif
 
-/**
- * @brief Initialize Non-Volatile Storage (NVS) flash partition.
- *        Handles corruption or version mismatch by formatting cleanly.
- * @return true on success, false on fatal failure.
- */
 bool player_data_init(void);
 
-/**
- * @brief Get total gold coins for a specific wizard profile.
- * @param profile Target profile (Ori, Ethan, Ayala).
- * @return Coins count (defaults to 0 if not previously saved).
- */
 uint32_t player_data_get_coins(WizardProfile_t profile);
-
-/**
- * @brief Add gold coins to a specific wizard profile and commit to NVS.
- * @param profile Target profile.
- * @param amount Coins to add.
- */
 void player_data_add_coins(WizardProfile_t profile, uint32_t amount);
-
-/**
- * @brief Get total Experience Points (XP) for a specific wizard profile.
- * @param profile Target profile.
- * @return XP count (defaults to 0 if not previously saved).
- */
 uint32_t player_data_get_xp(WizardProfile_t profile);
-
-/**
- * @brief Add XP to a specific wizard profile and commit to NVS.
- * @param profile Target profile.
- * @param amount XP to add.
- */
 void player_data_add_xp(WizardProfile_t profile, uint32_t amount);
 
-/**
- * @brief Get total questions answered today by a specific child profile.
- * @param profile Target profile.
- * @return Number of questions answered today.
- */
+/** Total correctly-completed questions today for the profile. */
 uint32_t player_data_get_questions_today(WizardProfile_t profile);
 
+/** Correctly-completed questions today for one subject (0..3). */
+uint32_t player_data_get_subject_questions_today(WizardProfile_t profile, int subject_id);
+
 /**
- * @brief Increment questions answered today for a specific child profile.
- * @param profile Target profile.
- * @return Updated count of questions answered today.
+ * Prepare the next legacy increment call with the answer result.
+ * eligible=true only for a correct answer on the first attempt.
+ */
+void player_data_prepare_question_count(WizardProfile_t profile, int subject_id, bool eligible);
+
+/**
+ * Consumes the prepared result. If the answer was not eligible, the count is
+ * returned unchanged. Kept under the legacy name because screen_manager.cpp
+ * already calls this function after every finalized answer.
  */
 uint32_t player_data_increment_questions_today(WizardProfile_t profile);
 
-/**
- * @brief Reset progress for all child profiles (for debugging/testing).
- */
+/** Persistent retry markers, indexed by the question ordinal within a subject. */
+void player_data_retry_set(WizardProfile_t profile, int subject_id, uint16_t ordinal, bool pending);
+int player_data_retry_find_next(WizardProfile_t profile, int subject_id,
+                                uint16_t start_ordinal, uint16_t question_count);
+
 void player_data_reset_all(void);
-
-/**
- * @brief Synchronize system time via SNTP for Israel timezone (IST-2IDT).
- */
 void player_data_sync_time(void);
-
-/**
- * @brief Check if system time has been synchronized from NTP.
- * @return true if valid year (>= 2025).
- */
 bool player_data_is_time_synced(void);
-
-/**
- * @brief Get current calendar date in Israel timezone as an integer YYYYMMDD.
- *        Returns 0 if time has not been synchronized yet.
- */
 uint32_t player_data_get_current_date(void);
 
 #ifdef __cplusplus
 }
 #endif
-
