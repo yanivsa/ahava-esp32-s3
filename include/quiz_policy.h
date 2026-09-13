@@ -11,12 +11,13 @@ static inline bool quiz_policy_should_count(bool is_correct, bool hint_used) {
 }
 
 /**
- * Ori's daily subject caps: mathematics (subject 0) is unlimited; Hebrew/
- * language, English, and Judaism/Halacha (subjects 1-3) are capped at 10
- * counted questions per day. Other profiles remain unlimited.
+ * Daily subject caps: mathematics (subject 0) is unlimited across all profiles;
+ * Hebrew/language, English, and Judaism/Halacha (subjects 1-3) are capped at 10
+ * counted questions per day.
  */
 static inline uint32_t quiz_policy_daily_limit(int profile, int subject_id) {
-    if (profile == 1 && subject_id >= 1 && subject_id <= 3) return 10u;
+    (void)profile;
+    if (subject_id >= 1 && subject_id <= 3) return 10u;
     return UINT32_MAX;
 }
 

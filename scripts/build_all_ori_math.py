@@ -72,6 +72,7 @@ def build_topic_01():
         if a == c: c += 1
         x = random.randint(-10, 10)
         b = random.randint(-15, 15)
+        # We want a*x + b = c*x + d => d = a*x + b - c*x = (a - c)*x + b
         d = (a - c) * x + b
         b_s = f"+ {b}" if b >= 0 else f"- {abs(b)}"
         d_s = f"+ {d}" if d >= 0 else f"- {abs(d)}"
@@ -80,7 +81,7 @@ def build_topic_01():
         dist = [f"x = {-x}", f"x = {x + 2}", f"x = {x - 2}"]
         opts, correct_idx = shuffle_options(ans, dist)
         hint = "כנסו איברים: העבירו את כל ה-x-ים לאגף אחד ואת המספרים לאגף השני."
-        exp = f"נכנס איברים: ({a}-{c})x = {d-b}, כלומר {a-c}x = {d-b}, ומכאן x = {x}."
+        exp = f"נכנס איברים: ({a}-{c})x = {d}-{b}, כלומר {a-c}x = {d-b}, ומכאן x = {x}."
         qs.append({
             "id": qid, "text": text, "options": opts, "answer": correct_idx,
             "hint": hint, "explanation": exp, "topic": "משוואות עם משתנה בשני האגפים"

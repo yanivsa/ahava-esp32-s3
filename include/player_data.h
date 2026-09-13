@@ -44,6 +44,12 @@ void player_data_retry_set(WizardProfile_t profile, int subject_id, uint16_t ord
 int player_data_retry_find_next(WizardProfile_t profile, int subject_id,
                                 uint16_t start_ordinal, uint16_t question_count);
 
+/** Persistent quiz sequence cursor and shuffle seed per profile and subject. */
+uint32_t player_data_get_quiz_seq(WizardProfile_t profile, int subject_id);
+void player_data_set_quiz_seq(WizardProfile_t profile, int subject_id, uint32_t seq);
+uint32_t player_data_get_quiz_seed(WizardProfile_t profile, int subject_id);
+void player_data_set_quiz_seed(WizardProfile_t profile, int subject_id, uint32_t seed);
+
 void player_data_reset_all(void);
 void player_data_sync_time(void);
 bool player_data_is_time_synced(void);

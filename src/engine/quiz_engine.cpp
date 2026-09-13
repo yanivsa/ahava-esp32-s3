@@ -22,7 +22,6 @@ constexpr size_t ORI_MATH_COUNT =
 constexpr size_t QUESTION_COUNT = BASE_QUESTION_COUNT + ORI_RELIGION_COUNT + ORI_MATH_COUNT;
 constexpr uint8_t RETRY_COOLDOWN_QUESTIONS = 2;
 
-static size_t next_match[PROFILE_MAX][4] = {};
 static uint16_t retry_cursor[PROFILE_MAX][4] = {};
 static uint8_t retry_cooldown[PROFILE_MAX][4] = {};
 static const Question_t *active_question = nullptr;
@@ -112,7 +111,52 @@ static void hint_close_clicked(lv_event_t *e) {
     if (mbox) lv_msgbox_close(mbox);
 }
 
-static void show_daily_limit_message(void) {
+static const char* get_subject_name_hebrew(WizardProfile_t profile, int subject_id) {
+    if (profile == PROFILE_AYALA) {
+        switch (subject_id) {
+            case 0: return "צורות ומספרים";
+            case 1: return "חיות וסביבה";
+            case 2: return "אנגלית";
+            case 3: return "שבת וחגים";
+            default: return "לימוד";
+        }
+    } else if (profile == PROFILE_ETHAN) {
+        switch (subject_id) {
+            case 0: return "חשבון וכפל";
+            case 1: return "לשון ועברית";
+            case 2: return "אנגלית";
+            case 3: return "מסורת ישראל";
+            default: return "לימוד";
+        }
+    } else {
+        switch (subject_id) {
+            case 0: return "מתמטיקה";
+            case 1: return "הבנת הנקרא ולשון";
+            case 2: return "אנגלית";
+            case 3: return "יהדות והלכה";
+            default: return "לימוד";
+        }
+    }
+}
+
+static uint32_t compute_coprime_stride(uint32_t n) {
+    if (n <= 1) return 1;
+    auto gcd_fn = [](uint32_t a, uint32_t b) {
+        while (b != 0) {
+            uint32_t t = b;
+            b = a % b;
+            a = t;
+        }
+        return a;
+    };
+    uint32_t stride = (n * 7u + 13u) | 1u;
+    while (gcd_fn(stride, n) != 1) {
+        stride += 2;
+    }
+    return stride;
+}
+
+static void show_daily_limit_message(WizardProfile_t profile, int subject_id) {
     lv_obj_t *mbox = lv_msgbox_create(NULL);
     if (!mbox) return;
     lv_obj_set_style_base_dir(mbox, LV_BASE_DIR_RTL, LV_PART_MAIN);
@@ -123,8 +167,17 @@ static void show_daily_limit_message(void) {
     lv_obj_set_size(mbox, 300, 250);
     lv_obj_center(mbox);
 
+    const ProfileInfo_t *pinfo = sm_get_profile_info(profile);
+    const char *name = (pinfo && pinfo->name_hebrew) ? pinfo->name_hebrew : "הקוסם";
+    const char *subject_name = get_subject_name_hebrew(profile, subject_id);
+
+    char msg_buf[192];
+    snprintf(msg_buf, sizeof(msg_buf),
+             "%s השלים 10 שאלות %s שנענו נכון בניסיון הראשון. אפשר לחזור מחר.",
+             name, subject_name);
+
     lv_obj_t *title = lv_msgbox_add_title(mbox, "המשימה היומית הושלמה 🎯");
-    lv_obj_t *text = lv_msgbox_add_text(mbox, "אורי השלים 10 שאלות יהדות שנענו נכון בניסיון הראשון. אפשר לחזור מחר.");
+    lv_obj_t *text = lv_msgbox_add_text(mbox, msg_buf);
     for (lv_obj_t *label : {title, text}) {
         if (!label) continue;
         lv_obj_set_style_text_font(label, &lv_font_hebrew_16, LV_PART_MAIN);
@@ -247,7 +300,7 @@ static void subject_play_proxy_clicked(lv_event_t *e) {
     const int subject_id = (int)reinterpret_cast<uintptr_t>(proxy->original_user_data);
     if (daily_limit_reached(current_profile, subject_id)) {
         audio_play_click();
-        show_daily_limit_message();
+        show_daily_limit_message(current_profile, subject_id);
         lv_event_stop_processing(e);
     }
 }
@@ -364,16 +417,35 @@ const Question_t* quiz_get_next_question(WizardProfile_t profile, int subject_id
         }
     }
 
-    size_t target = next_match[profile][subject_id]++ % count;
-    for (size_t i = 0; i < QUESTION_COUNT; ++i) {
-        const Question_t *q = question_at(i);
-        if (selectable_for_profile(i, q, profile, subject_id) && target-- == 0) {
-            active_question = q;
-            hinted_question_id = -1;
-            Serial.printf("[QUIZ] Question id=%d profile=%d subject=%d\n",
-                          q->id, (int)profile, subject_id);
-            return q;
-        }
+    const uint32_t stride = compute_coprime_stride((uint32_t)count);
+    uint32_t seed = player_data_get_quiz_seed(profile, subject_id);
+    uint32_t seq = player_data_get_quiz_seq(profile, subject_id);
+
+    // If uninitialized (seed == 0) or full cycle completed, re-seed with random offset
+    if (seed == 0 || seq >= count) {
+#if defined(ESP32) || defined(ARDUINO_ARCH_ESP32)
+        uint32_t r = esp_random();
+#else
+        uint32_t r = (uint32_t)rand();
+#endif
+        seed = (r % (uint32_t)count) + 1u; // 1-based seed to distinguish from 0
+        player_data_set_quiz_seed(profile, subject_id, seed);
+        seq = 0;
+    }
+
+    const uint32_t offset = (seed - 1u) % (uint32_t)count;
+    const uint32_t target_ordinal = (offset + (seq % (uint32_t)count) * stride) % (uint32_t)count;
+
+    // Advance and persist sequence for next question
+    player_data_set_quiz_seq(profile, subject_id, seq + 1u);
+
+    const Question_t *q = question_by_ordinal(profile, subject_id, (uint16_t)target_ordinal);
+    if (q) {
+        active_question = q;
+        hinted_question_id = -1;
+        Serial.printf("[QUIZ] Question id=%d profile=%d subject=%d seq=%u/%u ordinal=%u\n",
+                      q->id, (int)profile, subject_id, (unsigned)seq, (unsigned)count, (unsigned)target_ordinal);
+        return q;
     }
     return nullptr;
 }

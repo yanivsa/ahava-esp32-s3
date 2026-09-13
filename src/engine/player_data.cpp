@@ -397,6 +397,34 @@ int player_data_retry_find_next(WizardProfile_t profile, int subject_id,
     return -1;
 }
 
+uint32_t player_data_get_quiz_seq(WizardProfile_t profile, int subject_id) {
+    if (!valid_profile(profile) || !valid_subject(subject_id)) return 0;
+    char key[16];
+    make_subject_key(key, sizeof(key), "sq", profile, subject_id);
+    return nvs_read_u32_val(key, 0);
+}
+
+void player_data_set_quiz_seq(WizardProfile_t profile, int subject_id, uint32_t seq) {
+    if (!valid_profile(profile) || !valid_subject(subject_id)) return;
+    char key[16];
+    make_subject_key(key, sizeof(key), "sq", profile, subject_id);
+    nvs_write_u32_val(key, seq);
+}
+
+uint32_t player_data_get_quiz_seed(WizardProfile_t profile, int subject_id) {
+    if (!valid_profile(profile) || !valid_subject(subject_id)) return 0;
+    char key[16];
+    make_subject_key(key, sizeof(key), "sd", profile, subject_id);
+    return nvs_read_u32_val(key, 0);
+}
+
+void player_data_set_quiz_seed(WizardProfile_t profile, int subject_id, uint32_t seed) {
+    if (!valid_profile(profile) || !valid_subject(subject_id)) return;
+    char key[16];
+    make_subject_key(key, sizeof(key), "sd", profile, subject_id);
+    nvs_write_u32_val(key, seed);
+}
+
 void player_data_reset_all(void) {
     nvs_handle_t handle;
     if (nvs_open(NVS_STORAGE_NAMESPACE, NVS_READWRITE, &handle) == ESP_OK) {
