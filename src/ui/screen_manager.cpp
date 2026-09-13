@@ -134,13 +134,13 @@ static void ui_live_status_timer_cb(lv_timer_t *timer) {
 }
 
 void sm_init(void) {
-    current_profile = PROFILE_NONE;
+    current_profile = player_data_get_active_profile();
     current_screen_id = SCREEN_NONE;
     theme_manager_init();
     if (!s_live_status_timer) {
         s_live_status_timer = lv_timer_create(ui_live_status_timer_cb, 3000, NULL);
     }
-    Serial.println("[SM] Screen Manager initialized with live UI telemetry.");
+    Serial.printf("[SM] Screen Manager initialized (restored active profile: %d).\n", (int)current_profile);
 }
 
 
@@ -158,6 +158,7 @@ static void on_profile_selected(lv_event_t *e) {
 
         WizardProfile_t selected = (WizardProfile_t)(uintptr_t)lv_event_get_user_data(e);
         current_profile = selected;
+        player_data_set_active_profile(selected);
 
         const ProfileInfo_t *info = sm_get_profile_info(selected);
         Serial.printf("[UI] Selected Profile: %s (Age %u, Title: %s)\n", 
@@ -170,6 +171,8 @@ static void on_profile_selected(lv_event_t *e) {
 static void on_back_to_profiles_clicked(lv_event_t *e) {
     if (lv_event_get_code(e) == LV_EVENT_CLICKED) {
         audio_play_click();
+        current_profile = PROFILE_NONE;
+        player_data_set_active_profile(PROFILE_NONE);
         sm_load_screen(SCREEN_PROFILES);
     }
 }

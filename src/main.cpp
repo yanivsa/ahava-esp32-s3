@@ -15,10 +15,35 @@
 #include "audio_manager.h"
 #include "ota_manager.h"
 #include "hal_battery.h"
+#include "hal_touch.h"
 #include "esp_heap_caps.h"
+#include "esp_sleep.h"
+
+#define AUTO_SLEEP_TIMEOUT_MS (5UL * 60UL * 1000UL) // 5 minutes inactivity timeout
 
 /**
- * @brief Background task demonstrating thread-safe LVGL UI updates from non-GUI tasks
+ * @brief Enter ultra-low power deep sleep to preserve battery after inactivity
+ */
+static void enter_power_save_sleep(void) {
+    Serial.println("[POWER] 5 minutes of inactivity reached. Entering Deep Sleep...");
+
+    // 1. Fade/turn off LCD Backlight
+    hal_display_set_backlight(0);
+
+    // 2. Mute Audio Amplifier
+    audio_set_volume(0);
+
+    // 3. Disconnect and power down Wi-Fi
+    ota_wifi_disconnect();
+
+    delay(200);
+
+    // 4. Enter Deep Sleep
+    esp_deep_sleep_start();
+}
+
+/**
+ * @brief Background task monitoring telemetry, battery and auto-sleep inactivity
  */
 static void background_telemetry_task(void *pvParameters) {
     (void)pvParameters;
@@ -28,14 +53,25 @@ static void background_telemetry_task(void *pvParameters) {
         vTaskDelay(pdMS_TO_TICKS(5000));
         uptime_sec += 5;
 
-        Serial.printf("[TELEMETRY] Uptime: %us | Profile: %d | Bat: %u mV (%u%%, %s) | Free SRAM: %u KB | Free PSRAM: %u KB\n",
+        uint32_t inactive_ms = hal_touch_get_last_activity_ms();
+
+        Serial.printf("[TELEMETRY] Uptime: %us | Profile: %d | Inactive: %us | Bat: %u mV (%u%%, %s) | Free SRAM: %u KB | Free PSRAM: %u KB\n",
                       uptime_sec,
                       (int)current_profile,
+                      (unsigned int)(inactive_ms / 1000),
                       hal_battery_get_voltage_mv(),
                       hal_battery_get_percentage(),
                       hal_battery_is_charging() ? "CHG" : "BAT",
                       (unsigned int)(heap_caps_get_free_size(MALLOC_CAP_INTERNAL) / 1024),
                       (unsigned int)(heap_caps_get_free_size(MALLOC_CAP_SPIRAM) / 1024));
+
+        // Auto-Sleep trigger if inactive for > 5 minutes and no OTA update is in progress
+        if (inactive_ms >= AUTO_SLEEP_TIMEOUT_MS) {
+            OtaStatus_t ota_st = ota_get_status();
+            if (ota_st != OTA_STATUS_DOWNLOADING && ota_st != OTA_STATUS_PORTAL_ACTIVE) {
+                enter_power_save_sleep();
+            }
+        }
     }
 }
 
@@ -116,10 +152,14 @@ void setup() {
         }
     }
 
-    // 6. Initialize Screen Manager and load Profile Selection screen
+    // 6. Initialize Screen Manager and load active screen
     if (hal_lvgl_lock(portMAX_DELAY)) {
         sm_init();
-        sm_load_screen(SCREEN_PROFILES);
+        if (current_profile != PROFILE_NONE) {
+            sm_load_screen(SCREEN_DASHBOARD);
+        } else {
+            sm_load_screen(SCREEN_PROFILES);
+        }
         hal_lvgl_unlock();
     }
 

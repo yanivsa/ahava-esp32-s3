@@ -425,6 +425,18 @@ void player_data_set_quiz_seed(WizardProfile_t profile, int subject_id, uint32_t
     nvs_write_u32_val(key, seed);
 }
 
+WizardProfile_t player_data_get_active_profile(void) {
+    uint32_t val = nvs_read_u32_val("act_prof", (uint32_t)PROFILE_NONE);
+    if (val > (uint32_t)PROFILE_NONE && val < (uint32_t)PROFILE_MAX) {
+        return (WizardProfile_t)val;
+    }
+    return PROFILE_NONE;
+}
+
+void player_data_set_active_profile(WizardProfile_t profile) {
+    nvs_write_u32_val("act_prof", (uint32_t)profile);
+}
+
 void player_data_reset_all(void) {
     nvs_handle_t handle;
     if (nvs_open(NVS_STORAGE_NAMESPACE, NVS_READWRITE, &handle) == ESP_OK) {

@@ -12,6 +12,17 @@ static uint8_t touch_addr = 0;
 static uint16_t controller_max_x = BSP_LCD_H_RES;
 static uint16_t controller_max_y = BSP_LCD_V_RES;
 static uint8_t touch_log_budget = 8;
+static uint32_t s_last_touch_ms = 0;
+
+uint32_t hal_touch_get_last_activity_ms(void) {
+    uint32_t now = millis();
+    if (s_last_touch_ms == 0) return 0;
+    return (now >= s_last_touch_ms) ? (now - s_last_touch_ms) : 0;
+}
+
+void hal_touch_record_activity(void) {
+    s_last_touch_ms = millis();
+}
 
 static bool gt911_read(uint16_t reg, uint8_t *data, size_t len) {
     Wire.beginTransmission(touch_addr);
@@ -48,9 +59,8 @@ bool hal_touch_init(void) {
     }
 
     if (touch_found) {
-        // The controller is already hardware-reset by the board. Poll it directly;
-        // the generic TAMC driver assumes dedicated INT/RST GPIOs that MAX35 does not expose.
         touch_initialized = true;
+        s_last_touch_ms = millis();
         gt911_clear_status();
         uint8_t product_id[4] = {};
         uint8_t resolution[4] = {};
@@ -110,6 +120,7 @@ void hal_touch_read_cb(lv_indev_t *indev, lv_indev_data_t *data) {
         data->point.x = touch_x;
         data->point.y = touch_y;
         data->state = LV_INDEV_STATE_PRESSED;
+        s_last_touch_ms = millis();
         if (touch_log_budget) {
             Serial.printf("[HAL_TOUCH] raw=(%ld,%ld) mapped=(%ld,%ld)\n",
                           (long)raw_x, (long)raw_y, (long)touch_x, (long)touch_y);

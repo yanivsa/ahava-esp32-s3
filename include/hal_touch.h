@@ -26,6 +26,16 @@ bool hal_touch_init(void);
  */
 void hal_touch_read_cb(lv_indev_t *indev, lv_indev_data_t *data);
 
+/**
+ * @brief Get milliseconds since the last detected touch or user activity.
+ */
+uint32_t hal_touch_get_last_activity_ms(void);
+
+/**
+ * @brief Record user activity timestamp.
+ */
+void hal_touch_record_activity(void);
+
 #ifdef __cplusplus
 }
 #endif

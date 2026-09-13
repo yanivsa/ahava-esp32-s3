@@ -50,6 +50,10 @@ void player_data_set_quiz_seq(WizardProfile_t profile, int subject_id, uint32_t 
 uint32_t player_data_get_quiz_seed(WizardProfile_t profile, int subject_id);
 void player_data_set_quiz_seed(WizardProfile_t profile, int subject_id, uint32_t seed);
 
+/** Persistent active profile for wake-up restoration. */
+WizardProfile_t player_data_get_active_profile(void);
+void player_data_set_active_profile(WizardProfile_t profile);
+
 void player_data_reset_all(void);
 void player_data_sync_time(void);
 bool player_data_is_time_synced(void);
