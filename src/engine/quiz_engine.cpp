@@ -12,11 +12,14 @@
 namespace {
 #include "generated_questions.inc"
 #include "generated_ori_religion.inc"
+#include "generated_ori_math.inc"
 
 constexpr size_t BASE_QUESTION_COUNT = sizeof(QUESTIONS) / sizeof(QUESTIONS[0]);
 constexpr size_t ORI_RELIGION_COUNT =
     sizeof(ORI_RELIGION_QUESTIONS) / sizeof(ORI_RELIGION_QUESTIONS[0]);
-constexpr size_t QUESTION_COUNT = BASE_QUESTION_COUNT + ORI_RELIGION_COUNT;
+constexpr size_t ORI_MATH_COUNT =
+    sizeof(ORI_MATH_QUESTIONS) / sizeof(ORI_MATH_QUESTIONS[0]);
+constexpr size_t QUESTION_COUNT = BASE_QUESTION_COUNT + ORI_RELIGION_COUNT + ORI_MATH_COUNT;
 constexpr uint8_t RETRY_COOLDOWN_QUESTIONS = 2;
 
 static size_t next_match[PROFILE_MAX][4] = {};
@@ -41,6 +44,8 @@ static const Question_t* question_at(size_t index) {
     if (index < BASE_QUESTION_COUNT) return &QUESTIONS[index];
     index -= BASE_QUESTION_COUNT;
     if (index < ORI_RELIGION_COUNT) return &ORI_RELIGION_QUESTIONS[index];
+    index -= ORI_RELIGION_COUNT;
+    if (index < ORI_MATH_COUNT) return &ORI_MATH_QUESTIONS[index];
     return nullptr;
 }
 
@@ -49,8 +54,12 @@ static bool selectable_for_profile(size_t index, const Question_t *q,
     if (!q || q->target_profile != profile) return false;
     if (subject_filter >= 0 && q->subject_id != subject_filter) return false;
 
-    /* Ori's Judaism world intentionally uses the reviewed precision bank only. */
+    /* Ori's Judaism world uses the reviewed precision bank only. */
     if (profile == PROFILE_ORI && q->subject_id == 3 && index < BASE_QUESTION_COUNT) {
+        return false;
+    }
+    /* Ori's Math world uses the 1000+ Grade 8 math bank only (replacing the 65 old questions). */
+    if (profile == PROFILE_ORI && q->subject_id == 0 && index < BASE_QUESTION_COUNT) {
         return false;
     }
     return true;
@@ -264,6 +273,11 @@ bool quiz_validate_database(void) {
                       (unsigned)ORI_RELIGION_COUNT);
         ok = false;
     }
+    if (ORI_MATH_COUNT < 1000) {
+        Serial.printf("[QUIZ] Expected at least 1000 new Ori math questions, got %u\n",
+                      (unsigned)ORI_MATH_COUNT);
+        ok = false;
+    }
 
     for (size_t i = 0; i < QUESTION_COUNT; ++i) {
         const Question_t *qp = question_at(i);
@@ -282,8 +296,12 @@ bool quiz_validate_database(void) {
             if (other && other->id == q.id) row_ok = false;
         }
 
-        if (i >= BASE_QUESTION_COUNT) {
+        if (i >= BASE_QUESTION_COUNT && i < BASE_QUESTION_COUNT + ORI_RELIGION_COUNT) {
             if (q.target_profile != PROFILE_ORI || q.subject_id != 3 || !q.hint || !*q.hint) {
+                row_ok = false;
+            }
+        } else if (i >= BASE_QUESTION_COUNT + ORI_RELIGION_COUNT) {
+            if (q.target_profile != PROFILE_ORI || q.subject_id != 0 || !q.hint || !*q.hint) {
                 row_ok = false;
             }
         }
@@ -306,8 +324,8 @@ bool quiz_validate_database(void) {
         }
     }
 
-    Serial.printf("[QUIZ] Database validation: %u rows (%u new Ori Judaism), %s\n",
-                  (unsigned)QUESTION_COUNT, (unsigned)ORI_RELIGION_COUNT,
+    Serial.printf("[QUIZ] Database validation: %u rows (%u Ori Judaism, %u Ori Math), %s\n",
+                  (unsigned)QUESTION_COUNT, (unsigned)ORI_RELIGION_COUNT, (unsigned)ORI_MATH_COUNT,
                   ok ? "PASS" : "FAIL");
     return ok;
 }
