@@ -68,7 +68,17 @@ function addRow(profileEnum, subjectId, text, options, answerIdx, feedback) {
   if (!qText || qOpts.length !== 4) return;
   if (!Number.isInteger(answerIdx) || answerIdx < 0 || answerIdx > 3) return;
 
-  rows.push(`    {${numericId++}, ${subjectId}, ${profileEnum}, ${cpp(qText)}, {${qOpts.map(cpp).join(', ')}}, ${answerIdx}, ${cpp(qFb)}}`);
+  const currentId = numericId++;
+  // Balanced pseudo-random slot assignment (0..3) across question IDs
+  const targetSlot = (currentId * 3 + 1) % 4;
+  const reorderedOpts = [...qOpts];
+  if (answerIdx !== targetSlot) {
+    const temp = reorderedOpts[targetSlot];
+    reorderedOpts[targetSlot] = reorderedOpts[answerIdx];
+    reorderedOpts[answerIdx] = temp;
+  }
+
+  rows.push(`    {${currentId}, ${subjectId}, ${profileEnum}, ${cpp(qText)}, {${reorderedOpts.map(cpp).join(', ')}}, ${targetSlot}, ${cpp(qFb)}}`);
 }
 
 // 1. AYALA (Preschool, Age 3) - Visual & Emoji Rich
