@@ -238,13 +238,6 @@ static void hint_mbox_deleted(lv_event_t *e) {
     delete ctx;
 }
 
-static void hint_close_clicked(lv_event_t *e) {
-    if (lv_event_get_code(e) != LV_EVENT_CLICKED) return;
-    audio_play_click();
-    lv_obj_t *mbox = static_cast<lv_obj_t *>(lv_event_get_user_data(e));
-    if (mbox && lv_obj_is_valid(mbox)) lv_msgbox_close(mbox);
-}
-
 static void show_hint(const Question_t *q) {
     const char *hint = (q && q->hint && *q->hint)
         ? q->hint
