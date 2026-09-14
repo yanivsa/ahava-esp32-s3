@@ -295,18 +295,20 @@ bool ota_perform_silent_check(const char *url) {
     esp_app_desc_t app_desc;
     err = esp_https_ota_get_img_desc(https_ota_handle, &app_desc);
     if (err == ESP_OK) {
-        const esp_app_desc_t *running_desc = esp_app_get_description();
-        Serial.printf("[SILENT OTA] Running version: %s, Server version: %s\n",
-                      running_desc->version, app_desc.version);
-        if (memcmp(app_desc.version, running_desc->version, sizeof(app_desc.version)) == 0 &&
-            memcmp(app_desc.project_name, running_desc->project_name, sizeof(app_desc.project_name)) == 0 &&
-            memcmp(app_desc.time, running_desc->time, sizeof(app_desc.time)) == 0 &&
-            memcmp(app_desc.date, running_desc->date, sizeof(app_desc.date)) == 0) {
-            Serial.println("[SILENT OTA] Firmware is identical to running version. No update required.");
-            esp_https_ota_abort(https_ota_handle);
-            return false;
+        const esp_app_desc_t *running_desc = esp_ota_get_app_description();
+        if (running_desc) {
+            Serial.printf("[SILENT OTA] Running version: %s, Server version: %s\n",
+                          running_desc->version, app_desc.version);
+            if (memcmp(app_desc.version, running_desc->version, sizeof(app_desc.version)) == 0 &&
+                memcmp(app_desc.project_name, running_desc->project_name, sizeof(app_desc.project_name)) == 0 &&
+                memcmp(app_desc.time, running_desc->time, sizeof(app_desc.time)) == 0 &&
+                memcmp(app_desc.date, running_desc->date, sizeof(app_desc.date)) == 0) {
+                Serial.println("[SILENT OTA] Firmware is identical to running version. No update required.");
+                esp_https_ota_abort(https_ota_handle);
+                return false;
+            }
+            Serial.println("[SILENT OTA] New firmware version found! Downloading and flashing...");
         }
-        Serial.println("[SILENT OTA] New firmware version found! Downloading and flashing...");
     } else {
         Serial.printf("[SILENT OTA] Could not read new app desc (0x%x), proceeding to flash anyway.\n", err);
     }
