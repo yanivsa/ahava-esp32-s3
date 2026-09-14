@@ -55,6 +55,15 @@ bool ota_wifi_connect(const char *ssid, const char *pass, uint32_t timeout_ms);
 bool ota_perform_update(const char *url);
 
 /**
+ * @brief Perform a silent background OTA update check.
+ *        Does not touch UI or audio. Checks for new image and flashes if available.
+ * @param url HTTPS URL to the compiled firmware .bin file.
+ * @return true if update succeeded (device will reboot), false otherwise.
+ */
+bool ota_perform_silent_check(const char *url);
+
+
+/**
  * @brief Launch non-blocking OTA update in background FreeRTOS task on Core 0.
  * @param url HTTPS URL to firmware .bin.
  */

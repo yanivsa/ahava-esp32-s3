@@ -20,12 +20,43 @@
 #include "esp_sleep.h"
 
 #define AUTO_SLEEP_TIMEOUT_MS (5UL * 60UL * 1000UL) // 5 minutes inactivity timeout
+#define NIGHT_OTA_HOUR 1                            // 01:00 AM
+
+/**
+ * @brief Calculate seconds remaining until next target hour (01:00 AM) local time.
+ */
+static uint64_t calculate_seconds_until_night_ota(void) {
+    time_t now = time(NULL);
+    struct tm timeinfo;
+    if (localtime_r(&now, &timeinfo) == NULL || (timeinfo.tm_year + 1900 < 2025)) {
+        // Time not synced yet, fallback to checking again in 4 hours
+        return 4ULL * 3600ULL;
+    }
+
+    struct tm target = timeinfo;
+    target.tm_hour = NIGHT_OTA_HOUR;
+    target.tm_min = 0;
+    target.tm_sec = 0;
+
+    time_t target_time = mktime(&target);
+    if (target_time <= now) {
+        // If 01:00 AM has already passed today, schedule for 01:00 AM tomorrow
+        target_time += 24ULL * 3600ULL;
+    }
+
+    uint64_t diff = (uint64_t)difftime(target_time, now);
+    if (diff < 60) {
+        // Avoid immediate loop if waking up right around 01:00
+        diff = 24ULL * 3600ULL;
+    }
+    return diff;
+}
 
 /**
  * @brief Enter ultra-low power deep sleep to preserve battery after inactivity
  */
 static void enter_power_save_sleep(void) {
-    Serial.println("[POWER] 5 minutes of inactivity reached. Entering Deep Sleep...");
+    Serial.println("[POWER] Entering Deep Sleep...");
 
     // 1. Fade/turn off LCD Backlight
     hal_display_set_backlight(0);
@@ -36,9 +67,15 @@ static void enter_power_save_sleep(void) {
     // 3. Disconnect and power down Wi-Fi
     ota_wifi_disconnect();
 
+    // 4. Calculate time until next 01:00 AM check and enable timer wakeup
+    uint64_t sleep_sec = calculate_seconds_until_night_ota();
+    Serial.printf("[POWER] Scheduling next 01:00 AM OTA check in %llu seconds (%llu hours, %llu mins).\n",
+                  sleep_sec, sleep_sec / 3600ULL, (sleep_sec % 3600ULL) / 60ULL);
+    esp_sleep_enable_timer_wakeup(sleep_sec * 1000000ULL);
+
     delay(200);
 
-    // 4. Enter Deep Sleep
+    // 5. Enter Deep Sleep
     esp_deep_sleep_start();
 }
 
@@ -114,6 +151,29 @@ void setup() {
     // 2.1. Initialize Hardware Battery & Power Monitor (GPIO 6 / GPIO 7)
     hal_battery_init();
 
+    // 2.2. Check wake-up cause: If waking up via RTC Timer, handle silent night OTA check
+    esp_sleep_wakeup_cause_t wakeup_cause = esp_sleep_get_wakeup_cause();
+    if (wakeup_cause == ESP_SLEEP_WAKEUP_TIMER) {
+        Serial.println("[NIGHT_OTA] Woke up from Deep Sleep via Timer (01:00 AM scheduled check).");
+
+        uint8_t bat_pct = hal_battery_get_percentage();
+        Serial.printf("[NIGHT_OTA] Current battery level: %u%%\n", bat_pct);
+
+        // Safety check: preserve battery if under 20%
+        if (bat_pct < 20) {
+            Serial.println("[NIGHT_OTA] Battery below 20%. Skipping OTA check to protect battery.");
+            enter_power_save_sleep();
+            return;
+        }
+
+        Serial.println("[NIGHT_OTA] Checking for OTA updates silently (screen and audio off)...");
+        ota_manager_init();
+        ota_perform_silent_check(DEFAULT_OTA_FIRMWARE_URL);
+
+        Serial.println("[NIGHT_OTA] OTA check complete. Returning to Deep Sleep...");
+        enter_power_save_sleep();
+        return;
+    }
 
     // 3. Initialize I2S Audio Synthesizer on Core 0
     #if BSP_AUDIO_ENABLED

@@ -252,6 +252,92 @@ bool ota_perform_update(const char *url) {
     return true;
 }
 
+bool ota_perform_silent_check(const char *url) {
+    const char *target_url = (url && strlen(url) > 0) ? url : DEFAULT_OTA_FIRMWARE_URL;
+    if (!target_url[0]) {
+        Serial.println("[SILENT OTA] Update URL not set.");
+        return false;
+    }
+
+    if (!ota_is_wifi_connected()) {
+        Serial.println("[SILENT OTA] Wi-Fi not connected. Attempting quick connect (15s)...");
+        if (!ota_wifi_connect(DEFAULT_WIFI_SSID, DEFAULT_WIFI_PASS, 15000)) {
+            Serial.println("[SILENT OTA] Wi-Fi connection timed out.");
+            return false;
+        }
+    }
+
+    Serial.printf("[SILENT OTA] Checking for firmware at: %s\n", target_url);
+
+    esp_http_client_config_t http_config = {};
+    http_config.url = target_url;
+    http_config.cert_pem = OTA_ROOT_CA;
+    http_config.crt_bundle_attach = esp_crt_bundle_attach;
+    http_config.skip_cert_common_name_check = true;
+    http_config.buffer_size = 4096;
+    http_config.buffer_size_tx = 2048;
+    http_config.timeout_ms = 25000;
+    http_config.keep_alive_enable = true;
+    http_config.max_redirection_count = 5;
+
+    esp_https_ota_config_t ota_config = {
+        .http_config = &http_config,
+    };
+
+    esp_https_ota_handle_t https_ota_handle = NULL;
+    esp_err_t err = esp_https_ota_begin(&ota_config, &https_ota_handle);
+    if (err != ESP_OK) {
+        Serial.printf("[SILENT OTA] esp_https_ota_begin failed: 0x%x\n", err);
+        return false;
+    }
+
+    // Check image header vs running partition
+    esp_app_desc_t app_desc;
+    err = esp_https_ota_get_img_desc(https_ota_handle, &app_desc);
+    if (err == ESP_OK) {
+        const esp_app_desc_t *running_desc = esp_app_get_description();
+        Serial.printf("[SILENT OTA] Running version: %s, Server version: %s\n",
+                      running_desc->version, app_desc.version);
+        if (memcmp(app_desc.version, running_desc->version, sizeof(app_desc.version)) == 0 &&
+            memcmp(app_desc.project_name, running_desc->project_name, sizeof(app_desc.project_name)) == 0 &&
+            memcmp(app_desc.time, running_desc->time, sizeof(app_desc.time)) == 0 &&
+            memcmp(app_desc.date, running_desc->date, sizeof(app_desc.date)) == 0) {
+            Serial.println("[SILENT OTA] Firmware is identical to running version. No update required.");
+            esp_https_ota_abort(https_ota_handle);
+            return false;
+        }
+        Serial.println("[SILENT OTA] New firmware version found! Downloading and flashing...");
+    } else {
+        Serial.printf("[SILENT OTA] Could not read new app desc (0x%x), proceeding to flash anyway.\n", err);
+    }
+
+    // Perform download and flash
+    while (1) {
+        err = esp_https_ota_perform(https_ota_handle);
+        if (err != ESP_ERR_HTTPS_OTA_IN_PROGRESS) {
+            break;
+        }
+        vTaskDelay(pdMS_TO_TICKS(5));
+    }
+
+    if (err != ESP_OK) {
+        Serial.printf("[SILENT OTA] esp_https_ota_perform failed: 0x%x\n", err);
+        esp_https_ota_abort(https_ota_handle);
+        return false;
+    }
+
+    esp_err_t finish_err = esp_https_ota_finish(https_ota_handle);
+    if (finish_err != ESP_OK) {
+        Serial.printf("[SILENT OTA] esp_https_ota_finish failed: 0x%x\n", finish_err);
+        return false;
+    }
+
+    Serial.println("[SILENT OTA] Update SUCCESS! Rebooting now...");
+    delay(1000);
+    esp_restart();
+    return true;
+}
+
 static void ota_task_worker(void *pvParameters) {
     char *url_copy = (char *)pvParameters;
     ota_perform_update(url_copy);
