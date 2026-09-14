@@ -456,10 +456,22 @@ static void on_answer_clicked(lv_event_t *e) {
     lv_label_set_long_mode(result_text, LV_LABEL_LONG_WRAP);
 
     // Continue Button
-    lv_obj_t *continue_btn = lv_msgbox_add_footer_button(mbox, "המשך");
-    theme_apply_btn_main(continue_btn);
+    lv_obj_t *continue_btn = lv_msgbox_add_footer_button(mbox, is_correct ? "המשך" : "המשך (3)");
     lv_obj_set_size(continue_btn, 150, 48);
-    lv_obj_add_event_cb(continue_btn, on_msgbox_continue_clicked, LV_EVENT_CLICKED, NULL);
+    lv_obj_set_style_radius(continue_btn, 16, LV_PART_MAIN);
+
+    if (is_correct) {
+        theme_apply_btn_main(continue_btn);
+        lv_obj_add_event_cb(continue_btn, on_msgbox_continue_clicked, LV_EVENT_CLICKED, NULL);
+    } else {
+        // Wrong Answer: Lock continue button for 3 seconds so the child reads the explanation
+        lv_obj_remove_flag(continue_btn, LV_OBJ_FLAG_CLICKABLE);
+        lv_obj_set_style_bg_color(continue_btn, lv_color_hex(0x475569), LV_PART_MAIN);
+        lv_obj_set_style_bg_grad_color(continue_btn, lv_color_hex(0x334155), LV_PART_MAIN);
+        lv_obj_set_style_border_color(continue_btn, lv_color_hex(0x64748B), LV_PART_MAIN);
+        lv_obj_set_style_border_width(continue_btn, 1, LV_PART_MAIN);
+        lv_obj_add_event_cb(continue_btn, on_msgbox_continue_clicked, LV_EVENT_CLICKED, NULL);
+    }
 
     // LVGL's RTL footer can push a single button partly outside the message
     // box. Center the footer explicitly and keep layout direction neutral.
@@ -474,7 +486,60 @@ static void on_answer_clicked(lv_event_t *e) {
     lv_obj_t *btn_lbl = lv_obj_get_child(continue_btn, 0);
     if (btn_lbl) {
         lv_obj_set_style_text_font(btn_lbl, &lv_font_hebrew_24, LV_PART_MAIN);
+        if (!is_correct) {
+            lv_obj_set_style_text_color(btn_lbl, lv_color_hex(0x94A3B8), LV_PART_MAIN);
+        }
         lv_obj_set_style_base_dir(btn_lbl, LV_BASE_DIR_RTL, LV_PART_MAIN);
+    }
+
+    if (!is_correct) {
+        struct FeedbackModalContext {
+            lv_obj_t *mbox;
+            lv_obj_t *btn;
+            lv_obj_t *lbl;
+            lv_timer_t *timer;
+            int remaining_sec;
+        };
+
+        FeedbackModalContext *fctx = new FeedbackModalContext();
+        fctx->mbox = mbox;
+        fctx->btn = continue_btn;
+        fctx->lbl = btn_lbl;
+        fctx->remaining_sec = 3;
+
+        fctx->timer = lv_timer_create([](lv_timer_t *t) {
+            FeedbackModalContext *ctx = static_cast<FeedbackModalContext *>(lv_timer_get_user_data(t));
+            if (!ctx) return;
+            ctx->remaining_sec--;
+            if (ctx->remaining_sec > 0) {
+                char buf[32];
+                snprintf(buf, sizeof(buf), "המשך (%d)", ctx->remaining_sec);
+                if (ctx->lbl && lv_obj_is_valid(ctx->lbl)) {
+                    lv_label_set_text(ctx->lbl, buf);
+                }
+            } else {
+                if (ctx->btn && lv_obj_is_valid(ctx->btn)) {
+                    lv_obj_add_flag(ctx->btn, LV_OBJ_FLAG_CLICKABLE);
+                    theme_apply_btn_main(ctx->btn);
+                }
+                if (ctx->lbl && lv_obj_is_valid(ctx->lbl)) {
+                    lv_label_set_text(ctx->lbl, "המשך");
+                    lv_obj_set_style_text_color(ctx->lbl, lv_color_hex(0xFFFFFF), LV_PART_MAIN);
+                }
+                lv_timer_delete(t);
+                ctx->timer = nullptr;
+            }
+        }, 1000, fctx);
+
+        lv_obj_add_event_cb(mbox, [](lv_event_t *e) {
+            FeedbackModalContext *ctx = static_cast<FeedbackModalContext *>(lv_event_get_user_data(e));
+            if (!ctx) return;
+            if (ctx->timer) {
+                lv_timer_delete(ctx->timer);
+                ctx->timer = nullptr;
+            }
+            delete ctx;
+        }, LV_EVENT_DELETE, fctx);
     }
 }
 

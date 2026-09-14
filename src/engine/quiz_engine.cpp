@@ -194,6 +194,57 @@ static void show_daily_limit_message(WizardProfile_t profile, int subject_id) {
     lv_obj_add_event_cb(close_btn, hint_close_clicked, LV_EVENT_CLICKED, mbox);
 }
 
+struct HintModalContext {
+    lv_obj_t *mbox;
+    lv_obj_t *retry_btn;
+    lv_obj_t *btn_lbl;
+    lv_timer_t *timer;
+    int remaining_sec;
+};
+
+static void hint_timer_cb(lv_timer_t *t) {
+    HintModalContext *ctx = static_cast<HintModalContext *>(lv_timer_get_user_data(t));
+    if (!ctx) return;
+
+    ctx->remaining_sec--;
+    if (ctx->remaining_sec > 0) {
+        char buf[32];
+        snprintf(buf, sizeof(buf), "נסה שוב (%d)", ctx->remaining_sec);
+        if (ctx->btn_lbl && lv_obj_is_valid(ctx->btn_lbl)) {
+            lv_label_set_text(ctx->btn_lbl, buf);
+        }
+    } else {
+        // Cooldown finished: enable button and apply primary style
+        if (ctx->retry_btn && lv_obj_is_valid(ctx->retry_btn)) {
+            lv_obj_add_flag(ctx->retry_btn, LV_OBJ_FLAG_CLICKABLE);
+            theme_apply_btn_main(ctx->retry_btn);
+        }
+        if (ctx->btn_lbl && lv_obj_is_valid(ctx->btn_lbl)) {
+            lv_label_set_text(ctx->btn_lbl, "נסה שוב");
+            lv_obj_set_style_text_color(ctx->btn_lbl, lv_color_hex(0xFFFFFF), LV_PART_MAIN);
+        }
+        lv_timer_delete(t);
+        ctx->timer = nullptr;
+    }
+}
+
+static void hint_mbox_deleted(lv_event_t *e) {
+    HintModalContext *ctx = static_cast<HintModalContext *>(lv_event_get_user_data(e));
+    if (!ctx) return;
+    if (ctx->timer) {
+        lv_timer_delete(ctx->timer);
+        ctx->timer = nullptr;
+    }
+    delete ctx;
+}
+
+static void hint_close_clicked(lv_event_t *e) {
+    if (lv_event_get_code(e) != LV_EVENT_CLICKED) return;
+    audio_play_click();
+    lv_obj_t *mbox = static_cast<lv_obj_t *>(lv_event_get_user_data(e));
+    if (mbox && lv_obj_is_valid(mbox)) lv_msgbox_close(mbox);
+}
+
 static void show_hint(const Question_t *q) {
     const char *hint = (q && q->hint && *q->hint)
         ? q->hint
@@ -221,9 +272,16 @@ static void show_hint(const Question_t *q) {
     lv_obj_set_width(text, 250);
     lv_label_set_long_mode(text, LV_LABEL_LONG_WRAP);
 
-    lv_obj_t *retry_btn = lv_msgbox_add_footer_button(mbox, "נסה שוב");
-    theme_apply_btn_main(retry_btn);
+    lv_obj_t *retry_btn = lv_msgbox_add_footer_button(mbox, "נסה שוב (3)");
     lv_obj_set_size(retry_btn, 150, 48);
+    lv_obj_set_style_radius(retry_btn, 16, LV_PART_MAIN);
+
+    // Start in locked/disabled state with muted slate style
+    lv_obj_remove_flag(retry_btn, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_set_style_bg_color(retry_btn, lv_color_hex(0x475569), LV_PART_MAIN);
+    lv_obj_set_style_bg_grad_color(retry_btn, lv_color_hex(0x334155), LV_PART_MAIN);
+    lv_obj_set_style_border_color(retry_btn, lv_color_hex(0x64748B), LV_PART_MAIN);
+    lv_obj_set_style_border_width(retry_btn, 1, LV_PART_MAIN);
     lv_obj_add_event_cb(retry_btn, hint_close_clicked, LV_EVENT_CLICKED, mbox);
 
     lv_obj_t *footer = lv_obj_get_parent(retry_btn);
@@ -236,8 +294,18 @@ static void show_hint(const Question_t *q) {
     lv_obj_t *btn_lbl = lv_obj_get_child(retry_btn, 0);
     if (btn_lbl) {
         lv_obj_set_style_text_font(btn_lbl, &lv_font_hebrew_24, LV_PART_MAIN);
+        lv_obj_set_style_text_color(btn_lbl, lv_color_hex(0x94A3B8), LV_PART_MAIN);
         lv_obj_set_style_base_dir(btn_lbl, LV_BASE_DIR_RTL, LV_PART_MAIN);
     }
+
+    // Set up 3-second countdown timer
+    HintModalContext *ctx = new HintModalContext();
+    ctx->mbox = mbox;
+    ctx->retry_btn = retry_btn;
+    ctx->btn_lbl = btn_lbl;
+    ctx->remaining_sec = 3;
+    ctx->timer = lv_timer_create(hint_timer_cb, 1000, ctx);
+    lv_obj_add_event_cb(mbox, hint_mbox_deleted, LV_EVENT_DELETE, ctx);
 }
 
 static void answer_proxy_clicked(lv_event_t *e) {
@@ -280,6 +348,7 @@ static void answer_proxy_clicked(lv_event_t *e) {
 
     lv_obj_t *clicked_btn = static_cast<lv_obj_t *>(lv_event_get_target(e));
     if (clicked_btn) {
+        lv_obj_remove_flag(clicked_btn, LV_OBJ_FLAG_CLICKABLE);
         lv_obj_set_style_bg_color(clicked_btn, lv_color_hex(0xEF4444), LV_PART_MAIN);
         lv_obj_set_style_bg_grad_color(clicked_btn, lv_color_hex(0xDC2626), LV_PART_MAIN);
         lv_obj_set_style_border_color(clicked_btn, lv_color_hex(0xF87171), LV_PART_MAIN);
