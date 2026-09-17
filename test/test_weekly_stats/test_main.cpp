@@ -74,6 +74,18 @@ void test_invalid_subject_or_date_is_ignored() {
         TEST_ASSERT_EQUAL_UINT16(0, weekly_stats_get_correct(&stats, 20260917u, subject));
     }
 }
+
+void test_previous_date_handles_month_year_and_leap_boundaries() {
+#ifdef WEEKLY_STATS_HAS_DATE_HELPER
+    TEST_ASSERT_EQUAL_UINT32(20260916u, weekly_stats_previous_date(20260917u));
+    TEST_ASSERT_EQUAL_UINT32(20260831u, weekly_stats_previous_date(20260901u));
+    TEST_ASSERT_EQUAL_UINT32(20251231u, weekly_stats_previous_date(20260101u));
+    TEST_ASSERT_EQUAL_UINT32(20240229u, weekly_stats_previous_date(20240301u));
+    TEST_ASSERT_EQUAL_UINT32(20230228u, weekly_stats_previous_date(20230301u));
+#else
+    TEST_FAIL_MESSAGE("calendar previous-date helper is not implemented yet");
+#endif
+}
 #endif
 
 int main(int argc, char **argv) {
@@ -84,6 +96,7 @@ int main(int argc, char **argv) {
     RUN_TEST(test_keeps_only_seven_most_recent_activity_dates);
     RUN_TEST(test_out_of_order_date_does_not_evict_newer_history);
     RUN_TEST(test_invalid_subject_or_date_is_ignored);
+    RUN_TEST(test_previous_date_handles_month_year_and_leap_boundaries);
 #endif
     return UNITY_END();
 }
