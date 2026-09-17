@@ -8,6 +8,7 @@
 #define WEEKLY_STATS_DAYS 7
 #define WEEKLY_STATS_SUBJECTS 4
 #define WEEKLY_STATS_VERSION 1u
+#define WEEKLY_STATS_HAS_DATE_HELPER 1
 
 typedef struct {
     uint32_t date; // YYYYMMDD; 0 means unused/unknown
@@ -18,6 +19,40 @@ typedef struct {
     uint32_t version;
     WeeklyStatsDay_t days[WEEKLY_STATS_DAYS]; // Newest date first
 } WeeklyStats_t;
+
+static inline bool weekly_stats_is_leap_year(uint32_t year) {
+    return (year % 4u == 0u && year % 100u != 0u) || (year % 400u == 0u);
+}
+
+static inline uint8_t weekly_stats_days_in_month(uint32_t year, uint32_t month) {
+    static const uint8_t DAYS[] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+    if (month < 1u || month > 12u) return 0;
+    if (month == 2u && weekly_stats_is_leap_year(year)) return 29;
+    return DAYS[month - 1u];
+}
+
+static inline uint32_t weekly_stats_previous_date(uint32_t date) {
+    if (date == 0) return 0;
+    uint32_t year = date / 10000u;
+    uint32_t month = (date / 100u) % 100u;
+    uint32_t day = date % 100u;
+    if (year == 0 || month < 1u || month > 12u ||
+        day < 1u || day > weekly_stats_days_in_month(year, month)) return 0;
+
+    if (day > 1u) {
+        --day;
+    } else {
+        if (month > 1u) {
+            --month;
+        } else {
+            if (year <= 1u) return 0;
+            --year;
+            month = 12u;
+        }
+        day = weekly_stats_days_in_month(year, month);
+    }
+    return year * 10000u + month * 100u + day;
+}
 
 static inline void weekly_stats_clear(WeeklyStats_t *stats) {
     if (!stats) return;
