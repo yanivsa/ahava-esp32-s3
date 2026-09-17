@@ -3,6 +3,7 @@
 #include "audio_manager.h"
 #include "bsp_config.h"
 #include "screen_manager.h"
+#include "stats_dashboard_contract.h"
 #include "theme_manager.h"
 #include "weekly_stats_store.h"
 
@@ -12,7 +13,7 @@
 namespace {
 
 static lv_timer_t *s_stats_timer = nullptr;
-static lv_obj_t *s_launcher = nullptr;
+static lv_obj_t *s_stats_card = nullptr;
 static lv_obj_t *s_overlay = nullptr;
 
 static const lv_point_precise_t STAR_UP[] = {
@@ -129,7 +130,7 @@ static lv_obj_t *create_day_card(lv_obj_t *parent, int y, int height,
     lv_obj_set_style_text_color(date_lbl, lv_color_hex(0xF8FAFC), LV_PART_MAIN);
     lv_obj_set_style_base_dir(date_lbl, LV_BASE_DIR_RTL, LV_PART_MAIN);
     lv_obj_align(date_lbl, large ? LV_ALIGN_TOP_RIGHT : LV_ALIGN_RIGHT_MID,
-                 large ? -2 : -5, large ? 0 : 0);
+                 large ? -2 : -5, 0);
 
     if (large) {
         create_subject_values(card, day, 36, true);
@@ -221,29 +222,78 @@ static void open_stats(lv_event_t *e) {
     lv_obj_move_foreground(s_overlay);
 }
 
-static void create_launcher(lv_obj_t *root) {
-    s_launcher = lv_button_create(root);
-    lv_obj_set_size(s_launcher, 34, 56);
-    lv_obj_align(s_launcher, LV_ALIGN_LEFT_MID, 3, 0);
-    lv_obj_set_style_bg_color(s_launcher, lv_color_hex(0x1E293B), LV_PART_MAIN);
-    lv_obj_set_style_bg_opa(s_launcher, (lv_opa_t)LV_OPA_90, LV_PART_MAIN);
-    lv_obj_set_style_border_color(s_launcher, lv_color_hex(0x64748B), LV_PART_MAIN);
-    lv_obj_set_style_border_width(s_launcher, 1, LV_PART_MAIN);
-    lv_obj_set_style_radius(s_launcher, 10, LV_PART_MAIN);
-    lv_obj_set_style_pad_all(s_launcher, 0, LV_PART_MAIN);
-    lv_obj_add_event_cb(s_launcher, open_stats, LV_EVENT_CLICKED, nullptr);
+static lv_obj_t *dashboard_scroll_container(void) {
+    if (sm_get_current_screen() != SCREEN_DASHBOARD) return nullptr;
+    lv_obj_t *root = lv_screen_active();
+    if (!root || lv_obj_get_child_count(root) < 2) return nullptr;
 
-    for (int i = 0; i < 3; ++i) {
-        lv_obj_t *dot = lv_obj_create(s_launcher);
-        lv_obj_set_size(dot, 5, 5);
-        lv_obj_set_style_radius(dot, LV_RADIUS_CIRCLE, LV_PART_MAIN);
-        lv_obj_set_style_bg_color(dot, lv_color_hex(0xF8FAFC), LV_PART_MAIN);
-        lv_obj_set_style_bg_opa(dot, LV_OPA_COVER, LV_PART_MAIN);
-        lv_obj_set_style_border_width(dot, 0, LV_PART_MAIN);
-        lv_obj_set_pos(dot, 14, 14 + i * 12);
-        lv_obj_remove_flag(dot, (lv_obj_flag_t)(LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE));
+    // Dashboard construction is stable: HUD is child 0 and the vertical worlds
+    // list is child 1. Keep the statistics card inside that list so it scrolls
+    // naturally with the subjects instead of floating over the UI.
+    return lv_obj_get_child(root, 1);
+}
+
+static void create_dashboard_stats_card(void) {
+    lv_obj_t *scroll = dashboard_scroll_container();
+    if (!scroll) return;
+
+    s_stats_card = lv_button_create(scroll);
+    lv_obj_set_size(s_stats_card, 290, 82);
+    lv_obj_set_style_bg_color(s_stats_card, lv_color_hex(0x172554), LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(s_stats_card, LV_OPA_COVER, LV_PART_MAIN);
+    lv_obj_set_style_border_color(s_stats_card, lv_color_hex(0x94A3B8), LV_PART_MAIN);
+    lv_obj_set_style_border_width(s_stats_card, 2, LV_PART_MAIN);
+    lv_obj_set_style_radius(s_stats_card, 14, LV_PART_MAIN);
+    lv_obj_set_style_shadow_width(s_stats_card, 8, LV_PART_MAIN);
+    lv_obj_set_style_shadow_ofs_y(s_stats_card, 2, LV_PART_MAIN);
+    lv_obj_set_style_shadow_color(s_stats_card, lv_color_hex(0x020617), LV_PART_MAIN);
+    lv_obj_set_style_shadow_opa(s_stats_card, (lv_opa_t)LV_OPA_30, LV_PART_MAIN);
+    lv_obj_set_style_pad_all(s_stats_card, 8, LV_PART_MAIN);
+    lv_obj_set_style_base_dir(s_stats_card, LV_BASE_DIR_RTL, LV_PART_MAIN);
+    lv_obj_add_event_cb(s_stats_card, open_stats, LV_EVENT_CLICKED, nullptr);
+
+    // A simple numeric badge avoids dependence on emoji glyph support.
+    lv_obj_t *badge = lv_obj_create(s_stats_card);
+    lv_obj_set_size(badge, 46, 46);
+    lv_obj_align(badge, LV_ALIGN_LEFT_MID, 2, 0);
+    lv_obj_set_style_bg_color(badge, lv_color_hex(0x334155), LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(badge, LV_OPA_COVER, LV_PART_MAIN);
+    lv_obj_set_style_border_color(badge, lv_color_hex(0x94A3B8), LV_PART_MAIN);
+    lv_obj_set_style_border_width(badge, 1, LV_PART_MAIN);
+    lv_obj_set_style_radius(badge, LV_RADIUS_CIRCLE, LV_PART_MAIN);
+    lv_obj_remove_flag(badge, (lv_obj_flag_t)(LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE));
+
+    lv_obj_t *badge_lbl = lv_label_create(badge);
+    lv_label_set_text(badge_lbl, "7");
+    lv_obj_set_style_text_font(badge_lbl, &lv_font_hebrew_24, LV_PART_MAIN);
+    lv_obj_set_style_text_color(badge_lbl, lv_color_hex(0xF8FAFC), LV_PART_MAIN);
+    lv_obj_center(badge_lbl);
+
+    lv_obj_t *title = lv_label_create(s_stats_card);
+    lv_label_set_text(title, stats_dashboard_card_title());
+    lv_obj_set_width(title, 205);
+    lv_obj_set_style_text_font(title, &lv_font_hebrew_24, LV_PART_MAIN);
+    lv_obj_set_style_text_color(title, lv_color_hex(0xFFFFFF), LV_PART_MAIN);
+    lv_obj_set_style_text_align(title, LV_TEXT_ALIGN_RIGHT, LV_PART_MAIN);
+    lv_obj_set_style_base_dir(title, LV_BASE_DIR_RTL, LV_PART_MAIN);
+    lv_obj_align(title, LV_ALIGN_TOP_RIGHT, -2, 4);
+
+    lv_obj_t *subtitle = lv_label_create(s_stats_card);
+    lv_label_set_text(subtitle, "כמה שאלות נכונות בכל מקצוע");
+    lv_obj_set_width(subtitle, 205);
+    lv_obj_set_style_text_font(subtitle, &lv_font_hebrew_16, LV_PART_MAIN);
+    lv_obj_set_style_text_color(subtitle, lv_color_hex(0xCBD5E1), LV_PART_MAIN);
+    lv_obj_set_style_text_align(subtitle, LV_TEXT_ALIGN_RIGHT, LV_PART_MAIN);
+    lv_obj_set_style_base_dir(subtitle, LV_BASE_DIR_RTL, LV_PART_MAIN);
+    lv_obj_align(subtitle, LV_ALIGN_BOTTOM_RIGHT, -2, -4);
+
+    // The dashboard already contains 4 subject cards followed by System & OTA.
+    // Place statistics between those groups so it is exactly where the user
+    // expects it: under the subjects and before system/update settings.
+    const uint32_t child_count = lv_obj_get_child_count(scroll);
+    if (child_count >= 2) {
+        lv_obj_move_to_index(s_stats_card, (int32_t)child_count - 2);
     }
-    lv_obj_move_foreground(s_launcher);
 }
 
 static void stats_timer_cb(lv_timer_t *timer) {
@@ -255,21 +305,21 @@ static void stats_timer_cb(lv_timer_t *timer) {
     }
 
     if (sm_get_current_screen() != SCREEN_DASHBOARD) {
-        s_launcher = nullptr;
+        s_stats_card = nullptr;
         s_overlay = nullptr;
         return;
     }
 
-    if (s_launcher && lv_obj_is_valid(s_launcher)) return;
-    create_launcher(lv_screen_active());
+    if (s_stats_card && lv_obj_is_valid(s_stats_card)) return;
+    create_dashboard_stats_card();
 }
 
 } // namespace
 
 void stats_ui_init(void) {
     if (s_stats_timer) return;
-    s_stats_timer = lv_timer_create(stats_timer_cb, 2000, nullptr);
-    // Attach immediately instead of waiting two seconds after boot.
+    s_stats_timer = lv_timer_create(stats_timer_cb, 1000, nullptr);
+    // Attach immediately when booting directly into a restored dashboard.
     stats_timer_cb(s_stats_timer);
-    Serial.println("[STATS] Weekly statistics UI initialized.");
+    Serial.println("[STATS] Weekly statistics dashboard card initialized.");
 }
