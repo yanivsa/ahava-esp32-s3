@@ -10,8 +10,10 @@
 #include "hal_display.h"
 #include "theme_manager.h"
 #include "screen_manager.h"
+#include "stats_screen.h"
 #include "quiz_engine.h"
 #include "player_data.h"
+#include "weekly_stats_store.h"
 #include "audio_manager.h"
 #include "ota_manager.h"
 #include "hal_battery.h"
@@ -143,9 +145,13 @@ void setup() {
         while (true) delay(1000);
     }
 
-    // 2. Initialize Non-Volatile Storage (NVS) for persistent player stats
-    if (!player_data_init()) {
+    // 2. Initialize Non-Volatile Storage (NVS) for persistent player stats.
+    // Archive any saved daily bucket before normal getters can roll it over at midnight.
+    const bool player_data_ready = player_data_init();
+    if (!player_data_ready) {
         Serial.println("[SYS] WARN: NVS initialization encountered an issue.");
+    } else if (!weekly_stats_store_init()) {
+        Serial.println("[SYS] WARN: Weekly statistics history could not be fully initialized.");
     }
 
     // 2.1. Initialize Hardware Battery & Power Monitor (GPIO 6 / GPIO 7)
@@ -220,6 +226,7 @@ void setup() {
         } else {
             sm_load_screen(SCREEN_PROFILES);
         }
+        stats_ui_init();
         hal_lvgl_unlock();
     }
 
