@@ -1,5 +1,6 @@
 #include <unity.h>
 #include <stdint.h>
+#include <string.h>
 
 #if __has_include("weekly_stats.h")
 #include "weekly_stats.h"
@@ -8,11 +9,27 @@
 #define AHAVA_HAS_WEEKLY_STATS 0
 #endif
 
+#if __has_include("stats_dashboard_contract.h")
+#include "stats_dashboard_contract.h"
+#define AHAVA_HAS_STATS_DASHBOARD_CONTRACT 1
+#else
+#define AHAVA_HAS_STATS_DASHBOARD_CONTRACT 0
+#endif
+
 void test_weekly_stats_feature_exists() {
 #if AHAVA_HAS_WEEKLY_STATS
     TEST_ASSERT_TRUE(true);
 #else
     TEST_FAIL_MESSAGE("weekly_stats.h is not implemented yet");
+#endif
+}
+
+void test_dashboard_has_explicit_statistics_card_contract() {
+#if AHAVA_HAS_STATS_DASHBOARD_CONTRACT
+    TEST_ASSERT_TRUE(stats_dashboard_card_enabled());
+    TEST_ASSERT_EQUAL_STRING("סטטיסטיקה - 7 ימים", stats_dashboard_card_title());
+#else
+    TEST_FAIL_MESSAGE("explicit statistics dashboard card contract is not implemented yet");
 #endif
 }
 
@@ -91,6 +108,7 @@ void test_previous_date_handles_month_year_and_leap_boundaries() {
 int main(int argc, char **argv) {
     UNITY_BEGIN();
     RUN_TEST(test_weekly_stats_feature_exists);
+    RUN_TEST(test_dashboard_has_explicit_statistics_card_contract);
 #if AHAVA_HAS_WEEKLY_STATS
     RUN_TEST(test_records_correct_answers_by_day_and_subject);
     RUN_TEST(test_keeps_only_seven_most_recent_activity_dates);
