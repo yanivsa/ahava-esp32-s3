@@ -59,7 +59,7 @@ const cpp = value => JSON.stringify(String(value ?? '')).replaceAll('\\u2028', '
 const rows = [];
 let numericId = 1000;
 
-function addRow(profileEnum, subjectId, text, options, answerIdx, feedback) {
+function addRow(profileEnum, subjectId, text, options, answerIdx, feedback, hint = '', fixedId = null) {
   if (!options || !Array.isArray(options) || options.length !== 4) return;
   const qText = shortenText(text, 140);
   const qOpts = options.map(o => shortenOption(o, 50));
@@ -68,7 +68,7 @@ function addRow(profileEnum, subjectId, text, options, answerIdx, feedback) {
   if (!qText || qOpts.length !== 4) return;
   if (!Number.isInteger(answerIdx) || answerIdx < 0 || answerIdx > 3) return;
 
-  const currentId = numericId++;
+  const currentId = fixedId ?? numericId++;
   // Balanced pseudo-random slot assignment (0..3) across question IDs
   const targetSlot = (currentId * 3 + 1) % 4;
   const reorderedOpts = [...qOpts];
@@ -78,7 +78,7 @@ function addRow(profileEnum, subjectId, text, options, answerIdx, feedback) {
     reorderedOpts[answerIdx] = temp;
   }
 
-  rows.push(`    {${currentId}, ${subjectId}, ${profileEnum}, ${cpp(qText)}, {${reorderedOpts.map(cpp).join(', ')}}, ${targetSlot}, ${cpp(qFb)}}`);
+  rows.push(`    {${currentId}, ${subjectId}, ${profileEnum}, ${cpp(qText)}, {${reorderedOpts.map(cpp).join(', ')}}, ${targetSlot}, ${cpp(qFb)}, ${cpp(cleanText(hint))}}`);
 }
 
 // 1. AYALA (Preschool, Age 3) - Visual & Emoji Rich
@@ -178,6 +178,17 @@ for (const [sub, subId] of Object.entries(subjectsMap)) {
     if (!q.image && Array.isArray(q.options) && q.options.length === 4) {
       addRow('PROFILE_ETHAN', subId, q.text, q.options, q.answer, q.explanation || q.hint);
     }
+  }
+}
+
+
+// Eitan-only Wizard Challenges. IDs are fixed so adding this bank never shifts existing IDs.
+for (const [index, q] of (g2.challenges || []).entries()) {
+  const text = q.image ? q.deviceText : q.text;
+  const options = q.image ? q.deviceOptions : q.options;
+  if (q.targetProfile === 'eitan' && Array.isArray(options) && options.length === 4) {
+    addRow('PROFILE_ETHAN', 4, text, options, q.answer,
+           q.explanation || q.hint, q.hint || '', 8000 + index);
   }
 }
 
