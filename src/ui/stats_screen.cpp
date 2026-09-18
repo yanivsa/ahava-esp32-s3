@@ -2,6 +2,7 @@
 
 #include "audio_manager.h"
 #include "bsp_config.h"
+#include "hal_lvgl.h"
 #include "screen_manager.h"
 #include "stats_dashboard_contract.h"
 #include "theme_manager.h"
@@ -15,6 +16,14 @@ namespace {
 static lv_timer_t *s_stats_timer = nullptr;
 static lv_obj_t *s_stats_card = nullptr;
 static lv_obj_t *s_overlay = nullptr;
+static bool s_stats_landscape = false;
+
+static constexpr int STATS_SCREEN_W = 480;
+static constexpr int STATS_SCREEN_H = 320;
+static constexpr int STATS_MARGIN_X = 12;
+static constexpr int STATS_HEADER_H = 48;
+static constexpr int STATS_CONTENT_W = STATS_SCREEN_W - (STATS_MARGIN_X * 2);
+static constexpr int STATS_CONTENT_H = STATS_SCREEN_H - STATS_HEADER_H - 8;
 
 static const lv_point_precise_t STAR_UP[] = {
     {3, 16}, {11, 2}, {19, 16}, {3, 16}
@@ -39,13 +48,13 @@ static void make_star(lv_obj_t *parent, int x, int y, int size) {
 
     lv_obj_t *up = lv_line_create(box);
     lv_line_set_points(up, STAR_UP, sizeof(STAR_UP) / sizeof(STAR_UP[0]));
-    lv_obj_set_style_line_color(up, lv_color_hex(0xF8FAFC), LV_PART_MAIN);
+    lv_obj_set_style_line_color(up, lv_color_hex(0x0F172A), LV_PART_MAIN);
     lv_obj_set_style_line_width(up, 2, LV_PART_MAIN);
     lv_obj_center(up);
 
     lv_obj_t *down = lv_line_create(box);
     lv_line_set_points(down, STAR_DOWN, sizeof(STAR_DOWN) / sizeof(STAR_DOWN[0]));
-    lv_obj_set_style_line_color(down, lv_color_hex(0xF8FAFC), LV_PART_MAIN);
+    lv_obj_set_style_line_color(down, lv_color_hex(0x0F172A), LV_PART_MAIN);
     lv_obj_set_style_line_width(down, 2, LV_PART_MAIN);
     lv_obj_center(down);
 }
@@ -62,86 +71,136 @@ static void format_date(char *buf, size_t len, uint32_t date) {
 }
 
 static void create_text_value(lv_obj_t *parent, int x, int y, int width,
-                              const char *symbol, uint16_t value,
-                              const lv_font_t *font) {
+                              const char *symbol, uint16_t value, bool large) {
     lv_obj_t *label = lv_label_create(parent);
     char buf[32];
-    snprintf(buf, sizeof(buf), "%s %u", symbol, (unsigned)value);
+    snprintf(buf, sizeof(buf), "%s  %u", symbol, (unsigned)value);
     lv_label_set_text(label, buf);
     lv_obj_set_width(label, width);
     lv_obj_set_pos(label, x, y);
-    lv_obj_set_style_text_font(label, font, LV_PART_MAIN);
-    lv_obj_set_style_text_color(label, lv_color_hex(0xF8FAFC), LV_PART_MAIN);
+    lv_obj_set_style_text_font(label, large ? &lv_font_hebrew_24 : &lv_font_hebrew_16, LV_PART_MAIN);
+    lv_obj_set_style_text_color(label, lv_color_hex(0x0F172A), LV_PART_MAIN);
     lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
     lv_obj_set_style_base_dir(label, LV_BASE_DIR_LTR, LV_PART_MAIN);
 }
 
 static void create_star_value(lv_obj_t *parent, int x, int y, int width,
                               uint16_t value, bool large) {
-    const int icon_size = large ? 25 : 23;
-    make_star(parent, x + 2, y - (large ? 4 : 3), icon_size);
+    const int icon_size = large ? 26 : 22;
+    make_star(parent, x + 4, y - (large ? 2 : 1), icon_size);
 
     lv_obj_t *count = lv_label_create(parent);
     char buf[12];
     snprintf(buf, sizeof(buf), "%u", (unsigned)value);
     lv_label_set_text(count, buf);
-    lv_obj_set_pos(count, x + icon_size + 2, y);
-    lv_obj_set_width(count, width - icon_size - 4);
-    lv_obj_set_style_text_font(count, &lv_font_hebrew_16, LV_PART_MAIN);
-    lv_obj_set_style_text_color(count, lv_color_hex(0xF8FAFC), LV_PART_MAIN);
+    lv_obj_set_pos(count, x + icon_size + 8, y);
+    lv_obj_set_width(count, width - icon_size - 10);
+    lv_obj_set_style_text_font(count, large ? &lv_font_hebrew_24 : &lv_font_hebrew_16, LV_PART_MAIN);
+    lv_obj_set_style_text_color(count, lv_color_hex(0x0F172A), LV_PART_MAIN);
     lv_obj_set_style_text_align(count, LV_TEXT_ALIGN_LEFT, LV_PART_MAIN);
     lv_obj_set_style_base_dir(count, LV_BASE_DIR_LTR, LV_PART_MAIN);
 }
 
-static void create_subject_values(lv_obj_t *parent, const WeeklyStatsDay_t &day,
-                                  int y, bool large) {
-    // Visual order (right-to-left after the date): ×÷, א, ABC, Star of David.
-    // All subjects intentionally use the same neutral color.
-    const lv_font_t *font = &lv_font_hebrew_16;
-    create_star_value(parent, 5, y, 58, day.correct[3], large);
-    create_text_value(parent, 65, y, 66, "ABC", day.correct[2], font);
-    create_text_value(parent, 133, y, 52, "א", day.correct[1], font);
-    create_text_value(parent, 187, y, 72, "×÷", day.correct[0], font);
+static void add_card_divider(lv_obj_t *card, int y) {
+    lv_obj_t *divider = lv_obj_create(card);
+    lv_obj_set_pos(divider, 8, y);
+    lv_obj_set_size(divider, STATS_CONTENT_W - 18, 1);
+    lv_obj_set_style_bg_color(divider, lv_color_hex(0xE2E8F0), LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(divider, LV_OPA_COVER, LV_PART_MAIN);
+    lv_obj_set_style_border_width(divider, 0, LV_PART_MAIN);
+    lv_obj_set_style_radius(divider, 0, LV_PART_MAIN);
+    lv_obj_set_style_pad_all(divider, 0, LV_PART_MAIN);
+    lv_obj_remove_flag(divider, (lv_obj_flag_t)(LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE));
 }
 
-static lv_obj_t *create_day_card(lv_obj_t *parent, int y, int height,
-                                 const WeeklyStatsDay_t &day,
-                                 const char *prefix, bool large) {
-    lv_obj_t *card = lv_obj_create(parent);
-    lv_obj_set_size(card, 294, height);
-    lv_obj_set_pos(card, 13, y);
-    lv_obj_set_style_bg_color(card, lv_color_hex(0x172554), LV_PART_MAIN);
-    lv_obj_set_style_bg_opa(card, LV_OPA_COVER, LV_PART_MAIN);
-    lv_obj_set_style_border_color(card, lv_color_hex(0x475569), LV_PART_MAIN);
-    lv_obj_set_style_border_width(card, 1, LV_PART_MAIN);
-    lv_obj_set_style_radius(card, large ? 14 : 10, LV_PART_MAIN);
-    lv_obj_set_style_pad_all(card, 6, LV_PART_MAIN);
-    lv_obj_remove_flag(card, LV_OBJ_FLAG_SCROLLABLE);
-
+static void create_big_day_title(lv_obj_t *card, const WeeklyStatsDay_t &day, const char *prefix) {
     char date_buf[16];
     format_date(date_buf, sizeof(date_buf), day.date);
 
-    lv_obj_t *date_lbl = lv_label_create(card);
-    char title_buf[48];
-    if (prefix && *prefix) snprintf(title_buf, sizeof(title_buf), "%s %s", prefix, date_buf);
-    else snprintf(title_buf, sizeof(title_buf), "%s", date_buf);
-    lv_label_set_text(date_lbl, title_buf);
-    lv_obj_set_style_text_font(date_lbl, large ? &lv_font_hebrew_24 : &lv_font_hebrew_16, LV_PART_MAIN);
-    lv_obj_set_style_text_color(date_lbl, lv_color_hex(0xF8FAFC), LV_PART_MAIN);
-    lv_obj_set_style_base_dir(date_lbl, LV_BASE_DIR_RTL, LV_PART_MAIN);
-    lv_obj_align(date_lbl, large ? LV_ALIGN_TOP_RIGHT : LV_ALIGN_RIGHT_MID,
-                 large ? -2 : -5, 0);
+    lv_obj_t *prefix_lbl = lv_label_create(card);
+    lv_label_set_text(prefix_lbl, prefix);
+    lv_obj_set_pos(prefix_lbl, 348, 6);
+    lv_obj_set_width(prefix_lbl, 94);
+    lv_obj_set_style_text_font(prefix_lbl, &lv_font_hebrew_24, LV_PART_MAIN);
+    lv_obj_set_style_text_color(prefix_lbl, lv_color_hex(0x0F172A), LV_PART_MAIN);
+    lv_obj_set_style_text_align(prefix_lbl, LV_TEXT_ALIGN_RIGHT, LV_PART_MAIN);
+    lv_obj_set_style_base_dir(prefix_lbl, LV_BASE_DIR_RTL, LV_PART_MAIN);
 
-    if (large) {
-        create_subject_values(card, day, 36, true);
-    } else {
-        // Reserve the rightmost 67 px for the date and keep all four symbols visible.
-        create_star_value(card, 2, 7, 47, day.correct[3], false);
-        create_text_value(card, 48, 8, 58, "ABC", day.correct[2], &lv_font_hebrew_16);
-        create_text_value(card, 106, 8, 42, "א", day.correct[1], &lv_font_hebrew_16);
-        create_text_value(card, 148, 8, 65, "×÷", day.correct[0], &lv_font_hebrew_16);
-    }
+    lv_obj_t *date_lbl = lv_label_create(card);
+    lv_label_set_text(date_lbl, date_buf);
+    lv_obj_set_pos(date_lbl, 278, 10);
+    lv_obj_set_width(date_lbl, 66);
+    lv_obj_set_style_text_font(date_lbl, &lv_font_hebrew_16, LV_PART_MAIN);
+    lv_obj_set_style_text_color(date_lbl, lv_color_hex(0x475569), LV_PART_MAIN);
+    lv_obj_set_style_text_align(date_lbl, LV_TEXT_ALIGN_RIGHT, LV_PART_MAIN);
+    lv_obj_set_style_base_dir(date_lbl, LV_BASE_DIR_LTR, LV_PART_MAIN);
+}
+
+static void create_big_subject_values(lv_obj_t *card, const WeeklyStatsDay_t &day) {
+    // Fixed LTR geometry keeps the four columns stable; visually, RTL reading is:
+    // math, Hebrew, English, Judaism.
+    const int y = 43;
+    create_star_value(card, 10, y, 98, day.correct[3], true);
+    create_text_value(card, 112, y, 104, "ABC", day.correct[2], true);
+    create_text_value(card, 220, y, 78, "א", day.correct[1], true);
+    create_text_value(card, 304, y, 138, "×÷", day.correct[0], true);
+}
+
+static lv_obj_t *create_big_day_card(lv_obj_t *parent, int y,
+                                     const WeeklyStatsDay_t &day,
+                                     const char *prefix) {
+    lv_obj_t *card = lv_obj_create(parent);
+    lv_obj_set_size(card, STATS_CONTENT_W, 78);
+    lv_obj_set_pos(card, 0, y);
+    lv_obj_set_style_bg_color(card, lv_color_hex(0xFFFFFF), LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(card, LV_OPA_COVER, LV_PART_MAIN);
+    lv_obj_set_style_border_color(card, lv_color_hex(0xCBD5E1), LV_PART_MAIN);
+    lv_obj_set_style_border_width(card, 1, LV_PART_MAIN);
+    lv_obj_set_style_radius(card, 12, LV_PART_MAIN);
+    lv_obj_set_style_pad_all(card, 0, LV_PART_MAIN);
+    lv_obj_remove_flag(card, LV_OBJ_FLAG_SCROLLABLE);
+
+    create_big_day_title(card, day, prefix);
+    add_card_divider(card, 35);
+    create_big_subject_values(card, day);
     return card;
+}
+
+static lv_obj_t *create_compact_day_row(lv_obj_t *parent, int y,
+                                        const WeeklyStatsDay_t &day) {
+    lv_obj_t *row = lv_obj_create(parent);
+    lv_obj_set_size(row, STATS_CONTENT_W, 44);
+    lv_obj_set_pos(row, 0, y);
+    lv_obj_set_style_bg_color(row, lv_color_hex(0xFFFFFF), LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(row, LV_OPA_COVER, LV_PART_MAIN);
+    lv_obj_set_style_border_color(row, lv_color_hex(0xD7DEE8), LV_PART_MAIN);
+    lv_obj_set_style_border_width(row, 1, LV_PART_MAIN);
+    lv_obj_set_style_radius(row, 9, LV_PART_MAIN);
+    lv_obj_set_style_pad_all(row, 0, LV_PART_MAIN);
+    lv_obj_remove_flag(row, LV_OBJ_FLAG_SCROLLABLE);
+
+    char date_buf[16];
+    format_date(date_buf, sizeof(date_buf), day.date);
+    lv_obj_t *date_lbl = lv_label_create(row);
+    lv_label_set_text(date_lbl, date_buf);
+    lv_obj_set_pos(date_lbl, 372, 12);
+    lv_obj_set_width(date_lbl, 70);
+    lv_obj_set_style_text_font(date_lbl, &lv_font_hebrew_16, LV_PART_MAIN);
+    lv_obj_set_style_text_color(date_lbl, lv_color_hex(0x334155), LV_PART_MAIN);
+    lv_obj_set_style_text_align(date_lbl, LV_TEXT_ALIGN_RIGHT, LV_PART_MAIN);
+    lv_obj_set_style_base_dir(date_lbl, LV_BASE_DIR_LTR, LV_PART_MAIN);
+
+    create_text_value(row, 286, 12, 82, "×÷", day.correct[0], false);
+    create_text_value(row, 222, 12, 60, "א", day.correct[1], false);
+    create_text_value(row, 116, 12, 102, "ABC", day.correct[2], false);
+    create_star_value(row, 12, 12, 98, day.correct[3], false);
+    return row;
+}
+
+static void restore_stats_orientation(void) {
+    if (!s_stats_landscape) return;
+    hal_lvgl_set_landscape(false);
+    s_stats_landscape = false;
 }
 
 static void close_stats(lv_event_t *e) {
@@ -151,6 +210,7 @@ static void close_stats(lv_event_t *e) {
         lv_obj_delete(s_overlay);
     }
     s_overlay = nullptr;
+    restore_stats_orientation();
 }
 
 static void open_stats(lv_event_t *e) {
@@ -163,62 +223,114 @@ static void open_stats(lv_event_t *e) {
     WeeklyStatsDay_t days[WEEKLY_STATS_DAYS]{};
     const bool has_date = weekly_stats_store_get_last_seven(current_profile, days);
 
-    lv_obj_t *root = lv_screen_active();
+    // This screen is intentionally landscape-only. LVGL's software rotation also
+    // rotates pointer coordinates, while the physical panel stays in portrait mode.
+    hal_lvgl_set_landscape(true);
+    s_stats_landscape = true;
+
+    lv_obj_t *root = lv_layer_top();
     s_overlay = lv_obj_create(root);
-    lv_obj_set_size(s_overlay, BSP_LCD_H_RES, BSP_LCD_V_RES);
+    lv_obj_set_size(s_overlay, lv_pct(100), lv_pct(100));
     lv_obj_set_pos(s_overlay, 0, 0);
-    lv_obj_set_style_bg_color(s_overlay, lv_color_hex(0x07111F), LV_PART_MAIN);
+    lv_obj_set_style_bg_color(s_overlay, lv_color_hex(0xF6F8FC), LV_PART_MAIN);
     lv_obj_set_style_bg_opa(s_overlay, LV_OPA_COVER, LV_PART_MAIN);
     lv_obj_set_style_border_width(s_overlay, 0, LV_PART_MAIN);
     lv_obj_set_style_radius(s_overlay, 0, LV_PART_MAIN);
     lv_obj_set_style_pad_all(s_overlay, 0, LV_PART_MAIN);
     lv_obj_remove_flag(s_overlay, LV_OBJ_FLAG_SCROLLABLE);
 
-    lv_obj_t *title = lv_label_create(s_overlay);
-    lv_label_set_text(title, "ההתקדמות שלי");
-    lv_obj_set_style_text_font(title, &lv_font_hebrew_24, LV_PART_MAIN);
-    lv_obj_set_style_text_color(title, lv_color_hex(0xF8FAFC), LV_PART_MAIN);
-    lv_obj_set_style_base_dir(title, LV_BASE_DIR_RTL, LV_PART_MAIN);
-    lv_obj_align(title, LV_ALIGN_TOP_RIGHT, -14, 12);
+    // Fixed 48 px header: back on the left, title on the right.
+    lv_obj_t *header = lv_obj_create(s_overlay);
+    lv_obj_set_size(header, STATS_SCREEN_W, STATS_HEADER_H);
+    lv_obj_set_pos(header, 0, 0);
+    lv_obj_set_style_bg_color(header, lv_color_hex(0xFFFFFF), LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(header, LV_OPA_COVER, LV_PART_MAIN);
+    lv_obj_set_style_border_width(header, 0, LV_PART_MAIN);
+    lv_obj_set_style_pad_all(header, 0, LV_PART_MAIN);
+    lv_obj_remove_flag(header, LV_OBJ_FLAG_SCROLLABLE);
 
-    lv_obj_t *back = lv_button_create(s_overlay);
-    lv_obj_set_size(back, 62, 36);
-    lv_obj_align(back, LV_ALIGN_TOP_LEFT, 10, 8);
-    lv_obj_set_style_bg_color(back, lv_color_hex(0x334155), LV_PART_MAIN);
+    lv_obj_t *title = lv_label_create(header);
+    lv_label_set_text(title, "ההתקדמות שלי");
+    lv_obj_set_width(title, 250);
+    lv_obj_set_style_text_font(title, &lv_font_hebrew_24, LV_PART_MAIN);
+    lv_obj_set_style_text_color(title, lv_color_hex(0x0F172A), LV_PART_MAIN);
+    lv_obj_set_style_text_align(title, LV_TEXT_ALIGN_RIGHT, LV_PART_MAIN);
+    lv_obj_set_style_base_dir(title, LV_BASE_DIR_RTL, LV_PART_MAIN);
+    lv_obj_align(title, LV_ALIGN_RIGHT_MID, -14, 0);
+
+    lv_obj_t *back = lv_button_create(header);
+    lv_obj_set_size(back, 72, 34);
+    lv_obj_align(back, LV_ALIGN_LEFT_MID, 10, 0);
+    lv_obj_set_style_bg_color(back, lv_color_hex(0xE2E8F0), LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(back, LV_OPA_COVER, LV_PART_MAIN);
+    lv_obj_set_style_border_color(back, lv_color_hex(0xCBD5E1), LV_PART_MAIN);
+    lv_obj_set_style_border_width(back, 1, LV_PART_MAIN);
     lv_obj_set_style_radius(back, 9, LV_PART_MAIN);
     lv_obj_add_event_cb(back, close_stats, LV_EVENT_CLICKED, nullptr);
     lv_obj_t *back_lbl = lv_label_create(back);
     lv_label_set_text(back_lbl, "חזור");
     lv_obj_set_style_text_font(back_lbl, &lv_font_hebrew_16, LV_PART_MAIN);
-    lv_obj_set_style_text_color(back_lbl, lv_color_hex(0xFFFFFF), LV_PART_MAIN);
+    lv_obj_set_style_text_color(back_lbl, lv_color_hex(0x0F172A), LV_PART_MAIN);
+    lv_obj_set_style_base_dir(back_lbl, LV_BASE_DIR_RTL, LV_PART_MAIN);
     lv_obj_center(back_lbl);
 
+    lv_obj_t *separator = lv_obj_create(header);
+    lv_obj_set_size(separator, STATS_SCREEN_W, 1);
+    lv_obj_align(separator, LV_ALIGN_BOTTOM_MID, 0, 0);
+    lv_obj_set_style_bg_color(separator, lv_color_hex(0xCBD5E1), LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(separator, LV_OPA_COVER, LV_PART_MAIN);
+    lv_obj_set_style_border_width(separator, 0, LV_PART_MAIN);
+    lv_obj_set_style_pad_all(separator, 0, LV_PART_MAIN);
+    lv_obj_remove_flag(separator, (lv_obj_flag_t)(LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE));
+
+    // Vertical scrolling only. No horizontal panning is needed in landscape.
+    lv_obj_t *content = lv_obj_create(s_overlay);
+    lv_obj_set_size(content, STATS_CONTENT_W, STATS_CONTENT_H);
+    lv_obj_set_pos(content, STATS_MARGIN_X, STATS_HEADER_H + 4);
+    lv_obj_set_style_bg_opa(content, LV_OPA_TRANSP, LV_PART_MAIN);
+    lv_obj_set_style_border_width(content, 0, LV_PART_MAIN);
+    lv_obj_set_style_radius(content, 0, LV_PART_MAIN);
+    lv_obj_set_style_pad_all(content, 0, LV_PART_MAIN);
+    lv_obj_set_scroll_dir(content, LV_DIR_VER);
+    lv_obj_set_scrollbar_mode(content, LV_SCROLLBAR_MODE_AUTO);
+    lv_obj_set_style_width(content, 4, LV_PART_SCROLLBAR);
+    lv_obj_set_style_bg_color(content, lv_color_hex(0x94A3B8), LV_PART_SCROLLBAR);
+    lv_obj_set_style_bg_opa(content, LV_OPA_50, LV_PART_SCROLLBAR);
+    lv_obj_set_style_radius(content, LV_RADIUS_CIRCLE, LV_PART_SCROLLBAR);
+
     if (!has_date) {
-        lv_obj_t *empty = lv_label_create(s_overlay);
+        lv_obj_t *empty = lv_label_create(content);
         lv_label_set_text(empty, "הסטטיסטיקה תופיע כאן אחרי סנכרון השעה והתרגול הראשון");
-        lv_obj_set_width(empty, 280);
+        lv_obj_set_width(empty, 420);
         lv_label_set_long_mode(empty, LV_LABEL_LONG_WRAP);
         lv_obj_set_style_text_font(empty, &lv_font_hebrew_16, LV_PART_MAIN);
-        lv_obj_set_style_text_color(empty, lv_color_hex(0xCBD5E1), LV_PART_MAIN);
+        lv_obj_set_style_text_color(empty, lv_color_hex(0x475569), LV_PART_MAIN);
         lv_obj_set_style_text_align(empty, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
         lv_obj_set_style_base_dir(empty, LV_BASE_DIR_RTL, LV_PART_MAIN);
-        lv_obj_center(empty);
+        lv_obj_align(empty, LV_ALIGN_TOP_MID, 0, 72);
         lv_obj_move_foreground(s_overlay);
         return;
     }
 
-    create_day_card(s_overlay, 54, 76, days[0], "היום", true);
-    create_day_card(s_overlay, 136, 76, days[1], "אתמול", true);
+    int y = 0;
+    create_big_day_card(content, y, days[0], "היום");
+    y += 86;
+    create_big_day_card(content, y, days[1], "אתמול");
+    y += 86;
 
-    const int compact_y = 220;
-    const int compact_h = 40;
-    const int compact_gap = 5;
     for (int i = 2; i < WEEKLY_STATS_DAYS; ++i) {
-        create_day_card(s_overlay,
-                        compact_y + (i - 2) * (compact_h + compact_gap),
-                        compact_h, days[i], "", false);
+        create_compact_day_row(content, y, days[i]);
+        y += 50;
     }
 
+    // Ensure the final row creates enough scroll range without adding visual clutter.
+    lv_obj_t *spacer = lv_obj_create(content);
+    lv_obj_set_pos(spacer, 0, y);
+    lv_obj_set_size(spacer, 1, 8);
+    clear_obj_style(spacer);
+    lv_obj_remove_flag(spacer, (lv_obj_flag_t)(LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE));
+
+    lv_obj_scroll_to_y(content, 0, LV_ANIM_OFF);
     lv_obj_move_foreground(s_overlay);
 }
 

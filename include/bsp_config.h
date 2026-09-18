@@ -58,7 +58,7 @@ extern "C" {
 #define BSP_LCD_BL_PWM_RES_BITS    8
 #define BSP_LCD_BL_DEFAULT_DUTY    0    // MAX35 uses a P-channel high-side switch (active-low)
 
-#define FIRMWARE_VERSION           "v1.3.0"
+#define FIRMWARE_VERSION           "v1.3.1"
 
 /* ========================================================================== */
 /*                         I2S AUDIO DAC CONFIGURATION                        */
