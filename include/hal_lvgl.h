@@ -37,7 +37,7 @@ void hal_lvgl_unlock(void);
 
 /**
  * @brief Rotate LVGL logical display to landscape (480x320) or portrait (320x480).
- *        Uses LVGL software rotation; attached pointer input coordinates rotate with it.
+ *        The flush callback rotates RGB565 pixels; LVGL rotates pointer coordinates automatically.
  */
 void hal_lvgl_set_landscape(bool landscape);
 
