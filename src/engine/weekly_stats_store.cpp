@@ -10,18 +10,6 @@
 
 namespace {
 
-struct WeeklyStatsDayV1_t {
-    uint32_t date;
-    uint16_t correct[4];
-};
-
-struct WeeklyStatsV1_t {
-    uint32_t version;
-    WeeklyStatsDayV1_t days[WEEKLY_STATS_DAYS];
-};
-
-static bool save_history(WizardProfile_t profile, const WeeklyStats_t *stats);
-
 static bool valid_profile(WizardProfile_t profile) {
     return profile > PROFILE_NONE && profile < PROFILE_MAX;
 }
@@ -33,6 +21,11 @@ static void make_daily_date_key(char *buf, size_t len, WizardProfile_t profile) 
 static void make_daily_subject_key(char *buf, size_t len,
                                    WizardProfile_t profile, int subject_id) {
     snprintf(buf, len, "qs%d_%d", (int)profile, subject_id);
+}
+
+static void make_daily_stats_key(char *buf, size_t len,
+                                 WizardProfile_t profile, int subject_id) {
+    snprintf(buf, len, "qa%d_%d", (int)profile, subject_id);
 }
 
 static void make_history_key(char *buf, size_t len, WizardProfile_t profile) {
@@ -55,49 +48,22 @@ static bool load_history(WizardProfile_t profile, WeeklyStats_t *out_stats) {
     weekly_stats_clear(out_stats);
 
     nvs_handle_t handle;
-    if (nvs_open(NVS_STORAGE_NAMESPACE, NVS_READONLY, &handle) != ESP_OK) return false;
-
-    char key[16];
-    make_history_key(key, sizeof(key), profile);
-    size_t size = 0;
-    esp_err_t err = nvs_get_blob(handle, key, nullptr, &size);
-    if (err != ESP_OK) {
-        nvs_close(handle);
+    if (nvs_open(NVS_STORAGE_NAMESPACE, NVS_READONLY, &handle) != ESP_OK) {
         return false;
     }
 
-    if (size == sizeof(*out_stats)) {
-        err = nvs_get_blob(handle, key, out_stats, &size);
-        nvs_close(handle);
-        if (err != ESP_OK || out_stats->version != WEEKLY_STATS_VERSION) {
-            weekly_stats_clear(out_stats);
-            return false;
-        }
-        return true;
-    }
-
-    if (size == sizeof(WeeklyStatsV1_t)) {
-        WeeklyStatsV1_t legacy_stats{};
-        size_t legacy_size = sizeof(legacy_stats);
-        err = nvs_get_blob(handle, key, &legacy_stats, &legacy_size);
-        nvs_close(handle);
-        if (err != ESP_OK || legacy_stats.version != 1u) return false;
-
-        weekly_stats_clear(out_stats);
-        for (int day = 0; day < WEEKLY_STATS_DAYS; ++day) {
-            out_stats->days[day].date = legacy_stats.days[day].date;
-            for (int subject = 0; subject < 4; ++subject) {
-                out_stats->days[day].correct[subject] = legacy_stats.days[day].correct[subject];
-            }
-        }
-        save_history(profile, out_stats);
-        Serial.printf("[STATS] Migrated profile %d weekly history v1 -> v2.\n", (int)profile);
-        return true;
-    }
-
+    char key[16];
+    make_history_key(key, sizeof(key), profile);
+    size_t size = sizeof(*out_stats);
+    esp_err_t err = nvs_get_blob(handle, key, out_stats, &size);
     nvs_close(handle);
-    weekly_stats_clear(out_stats);
-    return false;
+
+    if (err != ESP_OK || size != sizeof(*out_stats) ||
+        out_stats->version != WEEKLY_STATS_VERSION) {
+        weekly_stats_clear(out_stats);
+        return false;
+    }
+    return true;
 }
 
 static bool save_history(WizardProfile_t profile, const WeeklyStats_t *stats) {
@@ -123,6 +89,10 @@ static uint32_t saved_daily_date(WizardProfile_t profile) {
 
 static uint32_t saved_subject_count(WizardProfile_t profile, int subject_id) {
     char key[16];
+    make_daily_stats_key(key, sizeof(key), profile, subject_id);
+    uint32_t value = read_u32(key, UINT32_MAX);
+    if (value != UINT32_MAX) return value;
+
     make_daily_subject_key(key, sizeof(key), profile, subject_id);
     return read_u32(key, 0);
 }

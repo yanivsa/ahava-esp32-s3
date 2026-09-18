@@ -4,7 +4,6 @@
 #include "bsp_config.h"
 #include "hal_lvgl.h"
 #include "screen_manager.h"
-#include "subjects.h"
 #include "stats_dashboard_contract.h"
 #include "theme_manager.h"
 #include "weekly_stats_store.h"
@@ -169,19 +168,13 @@ static void create_big_day_title(lv_obj_t *card, const WeeklyStatsDay_t &day, co
 }
 
 static void create_big_subject_values(lv_obj_t *card, const WeeklyStatsDay_t &day) {
+    // Fixed LTR geometry keeps the four columns stable; visually, RTL reading is:
+    // math, Hebrew, English, Judaism.
     const int y = 43;
-    if (current_profile == PROFILE_ETHAN) {
-        create_text_value(card, 8, y, 76, "?", day.correct[AHAVA_SUBJECT_CHALLENGES], true);
-        create_star_value(card, 88, y, 76, day.correct[AHAVA_SUBJECT_RELIGION], true);
-        create_text_value(card, 168, y, 92, "ABC", day.correct[AHAVA_SUBJECT_ENGLISH], true);
-        create_hebrew_value(card, 264, y, 70, day.correct[AHAVA_SUBJECT_HEBREW], true);
-        create_text_value(card, 338, y, 104, "×÷", day.correct[AHAVA_SUBJECT_MATH], true);
-        return;
-    }
-    create_star_value(card, 10, y, 98, day.correct[AHAVA_SUBJECT_RELIGION], true);
-    create_text_value(card, 112, y, 104, "ABC", day.correct[AHAVA_SUBJECT_ENGLISH], true);
-    create_hebrew_value(card, 220, y, 78, day.correct[AHAVA_SUBJECT_HEBREW], true);
-    create_text_value(card, 304, y, 138, "×÷", day.correct[AHAVA_SUBJECT_MATH], true);
+    create_star_value(card, 10, y, 98, day.correct[3], true);
+    create_text_value(card, 112, y, 104, "ABC", day.correct[2], true);
+    create_hebrew_value(card, 220, y, 78, day.correct[1], true);
+    create_text_value(card, 304, y, 138, "×÷", day.correct[0], true);
 }
 
 static lv_obj_t *create_big_day_card(lv_obj_t *parent, int y,
@@ -228,18 +221,10 @@ static lv_obj_t *create_compact_day_row(lv_obj_t *parent, int y,
     lv_obj_set_style_text_align(date_lbl, LV_TEXT_ALIGN_RIGHT, LV_PART_MAIN);
     lv_obj_set_style_base_dir(date_lbl, LV_BASE_DIR_LTR, LV_PART_MAIN);
 
-    if (current_profile == PROFILE_ETHAN) {
-        create_text_value(row, 304, 12, 62, "×÷", day.correct[AHAVA_SUBJECT_MATH], false);
-        create_hebrew_value(row, 246, 12, 54, day.correct[AHAVA_SUBJECT_HEBREW], false);
-        create_text_value(row, 164, 12, 78, "ABC", day.correct[AHAVA_SUBJECT_ENGLISH], false);
-        create_star_value(row, 92, 12, 68, day.correct[AHAVA_SUBJECT_RELIGION], false);
-        create_text_value(row, 20, 12, 68, "?", day.correct[AHAVA_SUBJECT_CHALLENGES], false);
-    } else {
-        create_text_value(row, 286, 12, 82, "×÷", day.correct[AHAVA_SUBJECT_MATH], false);
-        create_hebrew_value(row, 222, 12, 60, day.correct[AHAVA_SUBJECT_HEBREW], false);
-        create_text_value(row, 116, 12, 102, "ABC", day.correct[AHAVA_SUBJECT_ENGLISH], false);
-        create_star_value(row, 12, 12, 98, day.correct[AHAVA_SUBJECT_RELIGION], false);
-    }
+    create_text_value(row, 286, 12, 82, "×÷", day.correct[0], false);
+    create_hebrew_value(row, 222, 12, 60, day.correct[1], false);
+    create_text_value(row, 116, 12, 102, "ABC", day.correct[2], false);
+    create_star_value(row, 12, 12, 98, day.correct[3], false);
     return row;
 }
 

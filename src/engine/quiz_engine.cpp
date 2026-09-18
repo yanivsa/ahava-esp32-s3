@@ -315,11 +315,14 @@ static void answer_proxy_clicked(lv_event_t *e) {
     const bool hint_already_used = hinted_question_id == active_question->id;
     const WizardProfile_t profile = active_question->target_profile;
     const int subject_id = active_question->subject_id;
+    const int stats_subject_id = subject_id == AHAVA_SUBJECT_CHALLENGES
+        ? active_question->stats_subject_id
+        : subject_id;
     const int ordinal = question_ordinal(active_question);
 
     if (correct || hint_already_used) {
         const bool eligible = quiz_policy_should_count(correct, hint_already_used);
-        player_data_prepare_question_count(profile, subject_id, eligible);
+        player_data_prepare_question_count(profile, subject_id, stats_subject_id, eligible);
 
         if (ordinal >= 0) {
             if (eligible) {
@@ -443,8 +446,8 @@ bool quiz_validate_database(void) {
     }
 
     const size_t challenge_count = selectable_count(PROFILE_ETHAN, AHAVA_SUBJECT_CHALLENGES);
-    if (challenge_count != 25) {
-        Serial.printf("[QUIZ] Expected 25 Eitan wizard challenges, got %u\n", (unsigned)challenge_count);
+    if (challenge_count != 120) {
+        Serial.printf("[QUIZ] Expected 120 Eitan wizard challenges, got %u\n", (unsigned)challenge_count);
         ok = false;
     }
 

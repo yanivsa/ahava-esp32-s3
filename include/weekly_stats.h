@@ -4,11 +4,10 @@
 #include <stddef.h>
 #include <string.h>
 #include <limits.h>
-#include "subjects.h"
 
 #define WEEKLY_STATS_DAYS 7
-#define WEEKLY_STATS_SUBJECTS AHAVA_SUBJECT_COUNT
-#define WEEKLY_STATS_VERSION 2u
+#define WEEKLY_STATS_SUBJECTS 4
+#define WEEKLY_STATS_VERSION 1u
 #define WEEKLY_STATS_HAS_DATE_HELPER 1
 
 typedef struct {

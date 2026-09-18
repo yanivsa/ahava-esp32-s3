@@ -24,6 +24,7 @@ typedef struct {
     uint8_t correct_idx;             /**< 0-3 index of the correct answer */
     const char *feedback;            /**< Final explanation after the question ends */
     const char *hint;                /**< First-error hint; should not reveal the answer */
+    int8_t stats_subject_id;           /**< Academic stats bucket 0..3; separate from navigation subject */
 } Question_t;
 
 const Question_t* quiz_get_next_question(WizardProfile_t profile, int subject_id);

@@ -59,7 +59,7 @@ const cpp = value => JSON.stringify(String(value ?? '')).replaceAll('\\u2028', '
 const rows = [];
 let numericId = 1000;
 
-function addRow(profileEnum, subjectId, text, options, answerIdx, feedback, hint = '', fixedId = null) {
+function addRow(profileEnum, subjectId, text, options, answerIdx, feedback, hint = '', fixedId = null, statsSubjectId = subjectId) {
   if (!options || !Array.isArray(options) || options.length !== 4) return;
   const qText = shortenText(text, 140);
   const qOpts = options.map(o => shortenOption(o, 50));
@@ -78,7 +78,7 @@ function addRow(profileEnum, subjectId, text, options, answerIdx, feedback, hint
     reorderedOpts[answerIdx] = temp;
   }
 
-  rows.push(`    {${currentId}, ${subjectId}, ${profileEnum}, ${cpp(qText)}, {${reorderedOpts.map(cpp).join(', ')}}, ${targetSlot}, ${cpp(qFb)}, ${cpp(cleanText(hint))}}`);
+  rows.push(`    {${currentId}, ${subjectId}, ${profileEnum}, ${cpp(qText)}, {${reorderedOpts.map(cpp).join(', ')}}, ${targetSlot}, ${cpp(qFb)}, ${cpp(cleanText(hint))}, ${statsSubjectId}}`);
 }
 
 // 1. AYALA (Preschool, Age 3) - Visual & Emoji Rich
@@ -187,8 +187,10 @@ for (const [index, q] of (g2.challenges || []).entries()) {
   const text = q.image ? q.deviceText : q.text;
   const options = q.image ? q.deviceOptions : q.options;
   if (q.targetProfile === 'eitan' && Array.isArray(options) && options.length === 4) {
+    const statsSubjectId = ({ math: 0, hebrew: 1, english: 2, religion: 3 })[q.statsSubject];
+    if (!Number.isInteger(statsSubjectId)) throw new Error('Challenge ' + q.id + ' is missing a valid statsSubject');
     addRow('PROFILE_ETHAN', 4, text, options, q.answer,
-           q.explanation || q.hint, q.hint || '', 8000 + index);
+           q.explanation || q.hint, q.hint || '', 8000 + index, statsSubjectId);
   }
 }
 
