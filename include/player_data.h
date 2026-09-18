@@ -6,6 +6,7 @@
 #pragma once
 
 #include <stdint.h>
+#include "subjects.h"
 #include <stdbool.h>
 #include "screen_manager.h"
 
@@ -30,7 +31,7 @@ uint32_t player_data_get_subject_questions_today(WizardProfile_t profile, int su
  * Prepare the next legacy increment call with the answer result.
  * eligible=true only for a correct answer on the first attempt.
  */
-void player_data_prepare_question_count(WizardProfile_t profile, int subject_id, bool eligible);
+void player_data_prepare_question_count(WizardProfile_t profile, int subject_id, int stats_subject_id, bool eligible);
 
 /**
  * Consumes the prepared result. If the answer was not eligible, the count is

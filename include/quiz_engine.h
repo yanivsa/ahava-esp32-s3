@@ -6,6 +6,7 @@
 #pragma once
 
 #include <stdint.h>
+#include "subjects.h"
 #include <stdbool.h>
 #include "lvgl.h"
 #include "screen_manager.h"
@@ -16,13 +17,14 @@ extern "C" {
 
 typedef struct {
     int id;                          /**< Unique Question ID */
-    int subject_id;                  /**< 0 Math, 1 Hebrew, 2 English, 3 Judaism */
+    int subject_id;                  /**< 0 Math, 1 Hebrew, 2 English, 3 Judaism, 4 Wizard Challenges */
     WizardProfile_t target_profile;  /**< Ori, Ethan, Ayala */
     const char *text;                /**< Question prompt */
     const char *answers[4];          /**< Four multiple-choice options */
     uint8_t correct_idx;             /**< 0-3 index of the correct answer */
     const char *feedback;            /**< Final explanation after the question ends */
     const char *hint;                /**< First-error hint; should not reveal the answer */
+    int8_t stats_subject_id;           /**< Academic stats bucket 0..3; separate from navigation subject */
 } Question_t;
 
 const Question_t* quiz_get_next_question(WizardProfile_t profile, int subject_id);

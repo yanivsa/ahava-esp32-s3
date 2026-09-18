@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdint.h>
+#include "subjects.h"
 
 /**
  * A question counts only when the current display was answered correctly
@@ -17,7 +18,7 @@ static inline bool quiz_policy_should_count(bool is_correct, bool hint_used) {
  */
 static inline uint32_t quiz_policy_daily_limit(int profile, int subject_id) {
     (void)profile;
-    if (subject_id >= 1 && subject_id <= 3) return 10u;
+    if (subject_id >= AHAVA_SUBJECT_HEBREW && subject_id < AHAVA_SUBJECT_COUNT) return 10u;
     return UINT32_MAX;
 }
 

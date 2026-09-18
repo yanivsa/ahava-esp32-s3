@@ -23,6 +23,11 @@ static void make_daily_subject_key(char *buf, size_t len,
     snprintf(buf, len, "qs%d_%d", (int)profile, subject_id);
 }
 
+static void make_daily_stats_key(char *buf, size_t len,
+                                 WizardProfile_t profile, int subject_id) {
+    snprintf(buf, len, "qa%d_%d", (int)profile, subject_id);
+}
+
 static void make_history_key(char *buf, size_t len, WizardProfile_t profile) {
     snprintf(buf, len, "wh_%d", (int)profile);
 }
@@ -84,6 +89,10 @@ static uint32_t saved_daily_date(WizardProfile_t profile) {
 
 static uint32_t saved_subject_count(WizardProfile_t profile, int subject_id) {
     char key[16];
+    make_daily_stats_key(key, sizeof(key), profile, subject_id);
+    uint32_t value = read_u32(key, UINT32_MAX);
+    if (value != UINT32_MAX) return value;
+
     make_daily_subject_key(key, sizeof(key), profile, subject_id);
     return read_u32(key, 0);
 }

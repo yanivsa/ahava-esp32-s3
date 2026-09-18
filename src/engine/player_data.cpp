@@ -4,6 +4,7 @@
  */
 
 #include "player_data.h"
+#include "subjects.h"
 #include "quiz_policy.h"
 #include <Arduino.h>
 #include "nvs_flash.h"
@@ -28,6 +29,7 @@ static bool pending_count_valid = false;
 static bool pending_count_eligible = false;
 static WizardProfile_t pending_count_profile = PROFILE_NONE;
 static int pending_count_subject = -1;
+static int pending_count_stats_subject = -1;
 
 static uint32_t nvs_read_u32_val(const char *key, uint32_t default_val) {
     nvs_handle_t handle;
@@ -84,7 +86,7 @@ static bool valid_profile(WizardProfile_t profile) {
 }
 
 static bool valid_subject(int subject_id) {
-    return subject_id >= 0 && subject_id < 4;
+    return ahava_subject_valid(subject_id);
 }
 
 static uint32_t saturating_add(uint32_t a, uint32_t b) {
@@ -98,8 +100,12 @@ static void make_subject_key(char *buf, size_t len, const char *prefix,
 
 static void clear_unsynced_counts(WizardProfile_t profile) {
     char key[16];
-    for (int subject = 0; subject < 4; ++subject) {
+    for (int subject = 0; subject < AHAVA_SUBJECT_COUNT; ++subject) {
         make_subject_key(key, sizeof(key), "uq", profile, subject);
+        nvs_write_u32_val(key, 0);
+    }
+    for (int subject = 0; subject < AHAVA_ACADEMIC_SUBJECT_COUNT; ++subject) {
+        make_subject_key(key, sizeof(key), "ua", profile, subject);
         nvs_write_u32_val(key, 0);
     }
 }
@@ -107,7 +113,7 @@ static void clear_unsynced_counts(WizardProfile_t profile) {
 static uint32_t get_unsynced_total(WizardProfile_t profile) {
     char key[16];
     uint32_t total = 0;
-    for (int subject = 0; subject < 4; ++subject) {
+    for (int subject = 0; subject < AHAVA_SUBJECT_COUNT; ++subject) {
         make_subject_key(key, sizeof(key), "uq", profile, subject);
         total = saturating_add(total, nvs_read_u32_val(key, 0));
     }
@@ -123,8 +129,12 @@ static void reset_daily_counts(WizardProfile_t profile, uint32_t today) {
     snprintf(key, sizeof(key), "qt_%d", (int)profile);
     nvs_write_u32_val(key, 0);
 
-    for (int subject = 0; subject < 4; ++subject) {
+    for (int subject = 0; subject < AHAVA_SUBJECT_COUNT; ++subject) {
         make_subject_key(key, sizeof(key), "qs", profile, subject);
+        nvs_write_u32_val(key, 0);
+    }
+    for (int subject = 0; subject < AHAVA_ACADEMIC_SUBJECT_COUNT; ++subject) {
+        make_subject_key(key, sizeof(key), "qa", profile, subject);
         nvs_write_u32_val(key, 0);
     }
     clear_unsynced_counts(profile);
@@ -137,13 +147,25 @@ static void restore_unsynced_counts_for_date(WizardProfile_t profile, uint32_t t
     char key[16];
     uint32_t total = 0;
 
-    for (int subject = 0; subject < 4; ++subject) {
+    for (int subject = 0; subject < AHAVA_SUBJECT_COUNT; ++subject) {
         make_subject_key(key, sizeof(key), "uq", profile, subject);
         const uint32_t unsynced = nvs_read_u32_val(key, 0);
 
         make_subject_key(key, sizeof(key), "qs", profile, subject);
         nvs_write_u32_val(key, unsynced);
         total = saturating_add(total, unsynced);
+    }
+
+    // Restore academic statistics independently from category counters.
+    for (int subject = 0; subject < AHAVA_ACADEMIC_SUBJECT_COUNT; ++subject) {
+        make_subject_key(key, sizeof(key), "ua", profile, subject);
+        uint32_t academic_unsynced = nvs_read_u32_val(key, UINT32_MAX);
+        if (academic_unsynced == UINT32_MAX) {
+            make_subject_key(key, sizeof(key), "uq", profile, subject);
+            academic_unsynced = nvs_read_u32_val(key, 0);
+        }
+        make_subject_key(key, sizeof(key), "qa", profile, subject);
+        nvs_write_u32_val(key, academic_unsynced);
     }
 
     snprintf(key, sizeof(key), "qt_%d", (int)profile);
@@ -288,10 +310,14 @@ uint32_t player_data_get_subject_questions_today(WizardProfile_t profile, int su
     return nvs_read_u32_val(key, 0);
 }
 
-void player_data_prepare_question_count(WizardProfile_t profile, int subject_id, bool eligible) {
-    pending_count_valid = valid_profile(profile) && valid_subject(subject_id);
+void player_data_prepare_question_count(WizardProfile_t profile, int subject_id,
+                                        int stats_subject_id, bool eligible) {
+    pending_count_valid = valid_profile(profile) && valid_subject(subject_id) &&
+                          stats_subject_id >= 0 &&
+                          stats_subject_id < AHAVA_ACADEMIC_SUBJECT_COUNT;
     pending_count_profile = profile;
     pending_count_subject = subject_id;
+    pending_count_stats_subject = stats_subject_id;
     pending_count_eligible = eligible;
 }
 
@@ -306,12 +332,14 @@ uint32_t player_data_increment_questions_today(WizardProfile_t profile) {
                            pending_count_eligible &&
                            valid_subject(pending_count_subject);
     const int subject_id = pending_count_subject;
+    const int stats_subject_id = pending_count_stats_subject;
 
     // Consume the gate exactly once, regardless of outcome.
     pending_count_valid = false;
     pending_count_eligible = false;
     pending_count_profile = PROFILE_NONE;
     pending_count_subject = -1;
+    pending_count_stats_subject = -1;
 
     char total_key[16];
     snprintf(total_key, sizeof(total_key), "qt_%d", (int)profile);
@@ -332,6 +360,15 @@ uint32_t player_data_increment_questions_today(WizardProfile_t profile) {
         return current_total;
     }
 
+    char academic_key[16];
+    make_subject_key(academic_key, sizeof(academic_key), "qa", profile, stats_subject_id);
+    uint32_t academic_count = nvs_read_u32_val(academic_key, UINT32_MAX);
+    if (academic_count == UINT32_MAX) {
+        char legacy_key[16];
+        make_subject_key(legacy_key, sizeof(legacy_key), "qs", profile, stats_subject_id);
+        academic_count = nvs_read_u32_val(legacy_key, 0);
+    }
+
     if (count_date == 0) {
         // Track exactly how many eligible answers occurred while the date was
         // untrusted. If SNTP later reveals a new date, these deltas survive
@@ -340,6 +377,16 @@ uint32_t player_data_increment_questions_today(WizardProfile_t profile) {
         make_subject_key(unsynced_key, sizeof(unsynced_key), "uq", profile, subject_id);
         const uint32_t unsynced = nvs_read_u32_val(unsynced_key, 0);
         nvs_write_u32_val(unsynced_key, saturating_add(unsynced, 1));
+
+        char academic_unsynced_key[16];
+        make_subject_key(academic_unsynced_key, sizeof(academic_unsynced_key), "ua", profile, stats_subject_id);
+        uint32_t academic_unsynced = nvs_read_u32_val(academic_unsynced_key, UINT32_MAX);
+        if (academic_unsynced == UINT32_MAX) {
+            char legacy_unsynced_key[16];
+            make_subject_key(legacy_unsynced_key, sizeof(legacy_unsynced_key), "uq", profile, stats_subject_id);
+            academic_unsynced = nvs_read_u32_val(legacy_unsynced_key, 0);
+        }
+        nvs_write_u32_val(academic_unsynced_key, saturating_add(academic_unsynced, 1));
     }
 
     const uint32_t next_total = saturating_add(current_total, 1);
@@ -348,8 +395,12 @@ uint32_t player_data_increment_questions_today(WizardProfile_t profile) {
     const uint32_t next_subject = saturating_add(subject_count, 1);
     nvs_write_u32_val(subject_key, next_subject);
 
-    Serial.printf("[NVS] Profile %d subject %d: first-try correct -> total=%u subject=%u%s.\n",
-                  (int)profile, subject_id, (unsigned)next_total, (unsigned)next_subject,
+    const uint32_t next_academic = saturating_add(academic_count, 1);
+    nvs_write_u32_val(academic_key, next_academic);
+
+    Serial.printf("[NVS] Profile %d subject %d/stats %d: first-try correct -> total=%u subject=%u stats=%u%s.\n",
+                  (int)profile, subject_id, stats_subject_id,
+                  (unsigned)next_total, (unsigned)next_subject, (unsigned)next_academic,
                   count_date == 0 ? " (date unsynced)" : "");
     return next_total;
 }
