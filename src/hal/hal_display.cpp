@@ -8,7 +8,7 @@
 #include <Arduino.h>
 #include <TFT_eSPI.h>
 #include "esp_heap_caps.h"
-#include "lvgl/src/draw/sw/lv_draw_sw.h"
+#include "draw/sw/lv_draw_sw.h"
 
 static TFT_eSPI tft = TFT_eSPI();
 static uint8_t *rotation_buf = nullptr;
