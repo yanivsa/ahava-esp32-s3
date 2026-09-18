@@ -29,12 +29,13 @@ static bool ensure_rotation_buffer(size_t required) {
         rotation_buf = (uint8_t *)heap_caps_malloc(alloc_size, MALLOC_CAP_8BIT);
     }
     if (!rotation_buf) {
-        Serial.printf("[HAL_DISP] ERROR: rotation buffer allocation failed (%u bytes)\\n",\n                      (unsigned)alloc_size);
+        Serial.printf("[HAL_DISP] ERROR: rotation buffer allocation failed (%u bytes)\n",
+                      (unsigned)alloc_size);
         return false;
     }
 
     rotation_buf_size = alloc_size;
-    Serial.printf("[HAL_DISP] Rotation buffer ready: %u bytes\\n", (unsigned)alloc_size);
+    Serial.printf("[HAL_DISP] Rotation buffer ready: %u bytes\n", (unsigned)alloc_size);
     return true;
 }
 
