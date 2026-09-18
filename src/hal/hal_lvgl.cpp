@@ -151,6 +151,11 @@ void hal_lvgl_unlock(void) {
     }
 }
 
+void hal_lvgl_set_landscape(bool landscape) {
+    if (!lv_disp) return;
+    lv_display_set_rotation(lv_disp, landscape ? LV_DISP_ROTATION_90 : LV_DISP_ROTATION_0);
+}
+
 lv_display_t* hal_lvgl_get_display(void) {
     return lv_disp;
 }

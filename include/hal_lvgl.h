@@ -34,6 +34,13 @@ bool hal_lvgl_lock(uint32_t timeout_ms);
  */
 void hal_lvgl_unlock(void);
 
+
+/**
+ * @brief Rotate LVGL logical display to landscape (480x320) or portrait (320x480).
+ *        Uses LVGL software rotation; attached pointer input coordinates rotate with it.
+ */
+void hal_lvgl_set_landscape(bool landscape);
+
 /**
  * @brief Get the active LVGL display instance.
  * @return Pointer to lv_display_t.
