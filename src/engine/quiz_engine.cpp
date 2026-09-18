@@ -446,8 +446,8 @@ bool quiz_validate_database(void) {
     }
 
     const size_t challenge_count = selectable_count(PROFILE_ETHAN, AHAVA_SUBJECT_CHALLENGES);
-    if (challenge_count != 120) {
-        Serial.printf("[QUIZ] Expected 120 Eitan wizard challenges, got %u\n", (unsigned)challenge_count);
+    if (challenge_count != 1152) {
+        Serial.printf("[QUIZ] Expected 1152 Eitan wizard challenges, got %u\n", (unsigned)challenge_count);
         ok = false;
     }
 
