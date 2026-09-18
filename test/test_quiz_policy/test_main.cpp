@@ -1,5 +1,6 @@
 #include <unity.h>
 #include "quiz_policy.h"
+#include "subjects.h"
 
 void test_only_first_try_correct_counts() {
     TEST_ASSERT_TRUE(quiz_policy_should_count(true, false));
@@ -30,8 +31,14 @@ void test_valid_date_rollover_resets_only_without_unsynced_activity() {
                       quiz_policy_daily_bucket_action(20260909, 0, true));
 }
 
+
+void test_eitan_challenges_have_ten_question_daily_cap() {
+    TEST_ASSERT_EQUAL_UINT32(10u, quiz_policy_daily_limit(2, AHAVA_SUBJECT_CHALLENGES));
+}
+
 int main(int argc, char **argv) {
     UNITY_BEGIN();
+    RUN_TEST(test_eitan_challenges_have_ten_question_daily_cap);
     RUN_TEST(test_only_first_try_correct_counts);
     RUN_TEST(test_only_math_is_unlimited);
     RUN_TEST(test_valid_date_rollover_resets_only_without_unsynced_activity);

@@ -1,5 +1,6 @@
 /** Offline Ahava question bank adapted for the MAX35 handheld. */
 #include "quiz_engine.h"
+#include "subjects.h"
 #undef lv_obj_add_event_cb
 
 #include "audio_manager.h"
@@ -22,8 +23,8 @@ constexpr size_t ORI_MATH_COUNT =
 constexpr size_t QUESTION_COUNT = BASE_QUESTION_COUNT + ORI_RELIGION_COUNT + ORI_MATH_COUNT;
 constexpr uint8_t RETRY_COOLDOWN_QUESTIONS = 2;
 
-static uint16_t retry_cursor[PROFILE_MAX][4] = {};
-static uint8_t retry_cooldown[PROFILE_MAX][4] = {};
+static uint16_t retry_cursor[PROFILE_MAX][AHAVA_SUBJECT_COUNT] = {};
+static uint8_t retry_cooldown[PROFILE_MAX][AHAVA_SUBJECT_COUNT] = {};
 static const Question_t *active_question = nullptr;
 static int hinted_question_id = -1;
 
@@ -32,7 +33,7 @@ struct EventProxy {
     void *original_user_data = nullptr;
 };
 static EventProxy answer_proxy[4];
-static EventProxy subject_proxy[4];
+static EventProxy subject_proxy[AHAVA_SUBJECT_COUNT];
 static EventProxy continue_proxy;
 
 static bool valid_profile(WizardProfile_t profile) {
@@ -75,7 +76,7 @@ static size_t selectable_count(WizardProfile_t profile, int subject_id) {
 
 static int question_ordinal(const Question_t *target) {
     if (!target || !valid_profile(target->target_profile) ||
-        target->subject_id < 0 || target->subject_id > 3) return -1;
+        !ahava_subject_valid(target->subject_id)) return -1;
 
     int ordinal = 0;
     for (size_t i = 0; i < QUESTION_COUNT; ++i) {
@@ -126,6 +127,7 @@ static const char* get_subject_name_hebrew(WizardProfile_t profile, int subject_
             case 1: return "לשון ועברית";
             case 2: return "אנגלית";
             case 3: return "מסורת ישראל";
+            case AHAVA_SUBJECT_CHALLENGES: return "חִידוֹת הַקּוֹסְמִים";
             default: return "לימוד";
         }
     } else {
@@ -402,7 +404,7 @@ bool quiz_validate_database(void) {
         }
 
         const Question_t &q = *qp;
-        bool row_ok = valid_profile(q.target_profile) && q.subject_id >= 0 && q.subject_id <= 3 &&
+        bool row_ok = valid_profile(q.target_profile) && ahava_subject_valid(q.subject_id) &&
                       q.correct_idx <= 3 && q.text && *q.text && q.feedback && *q.feedback;
         for (const char *answer : q.answers) if (!answer || !*answer) row_ok = false;
 
@@ -429,7 +431,8 @@ bool quiz_validate_database(void) {
     }
 
     for (int profile = PROFILE_ORI; profile < PROFILE_MAX; ++profile) {
-        for (int subject = 0; subject < 4; ++subject) {
+        const int subject_count = profile == PROFILE_ETHAN ? AHAVA_SUBJECT_COUNT : AHAVA_SUBJECT_CHALLENGES;
+        for (int subject = 0; subject < subject_count; ++subject) {
             size_t count = selectable_count((WizardProfile_t)profile, subject);
             if (count < 3) {
                 Serial.printf("[QUIZ] Missing active coverage profile=%d subject=%d count=%u\n",
@@ -439,6 +442,12 @@ bool quiz_validate_database(void) {
         }
     }
 
+    const size_t challenge_count = selectable_count(PROFILE_ETHAN, AHAVA_SUBJECT_CHALLENGES);
+    if (challenge_count != 25) {
+        Serial.printf("[QUIZ] Expected 25 Eitan wizard challenges, got %u\n", (unsigned)challenge_count);
+        ok = false;
+    }
+
     Serial.printf("[QUIZ] Database validation: %u rows (%u Ori Judaism, %u Ori Math), %s\n",
                   (unsigned)QUESTION_COUNT, (unsigned)ORI_RELIGION_COUNT, (unsigned)ORI_MATH_COUNT,
                   ok ? "PASS" : "FAIL");
@@ -446,7 +455,8 @@ bool quiz_validate_database(void) {
 }
 
 const Question_t* quiz_get_next_question(WizardProfile_t profile, int subject_id) {
-    if (!valid_profile(profile) || subject_id < 0 || subject_id > 3) return nullptr;
+    if (!valid_profile(profile) || !ahava_subject_valid(subject_id)) return nullptr;
+    if (subject_id == AHAVA_SUBJECT_CHALLENGES && profile != PROFILE_ETHAN) return nullptr;
 
     if (daily_limit_reached(profile, subject_id)) {
         Serial.printf("[QUIZ] Daily limit reached profile=%d subject=%d.\n",
@@ -517,7 +527,8 @@ size_t quiz_get_total_questions(void) {
 }
 
 size_t quiz_get_question_count(WizardProfile_t profile, int subject_id) {
-    if (!valid_profile(profile) || subject_id < -1 || subject_id > 3) return 0;
+    if (!valid_profile(profile) || subject_id < -1 || subject_id >= AHAVA_SUBJECT_COUNT) return 0;
+    if (subject_id == AHAVA_SUBJECT_CHALLENGES && profile != PROFILE_ETHAN) return 0;
     size_t count = 0;
     for (size_t i = 0; i < QUESTION_COUNT; ++i) {
         const Question_t *q = question_at(i);
@@ -543,7 +554,7 @@ lv_event_dsc_t* quiz_register_event_cb(lv_obj_t *obj, lv_event_cb_t cb,
     if (callback_name && filter == LV_EVENT_CLICKED &&
         std::strcmp(callback_name, "on_play_subject_clicked") == 0) {
         const uintptr_t subject = reinterpret_cast<uintptr_t>(user_data);
-        if (subject < 4) {
+        if (subject < AHAVA_SUBJECT_COUNT) {
             subject_proxy[subject].original_cb = cb;
             subject_proxy[subject].original_user_data = user_data;
             lv_obj_add_event_cb(obj, subject_play_proxy_clicked, filter, &subject_proxy[subject]);

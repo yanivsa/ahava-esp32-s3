@@ -6,6 +6,7 @@
 #pragma once
 
 #include <stdint.h>
+#include "subjects.h"
 #include <stdbool.h>
 #include "lvgl.h"
 #include "screen_manager.h"
@@ -16,7 +17,7 @@ extern "C" {
 
 typedef struct {
     int id;                          /**< Unique Question ID */
-    int subject_id;                  /**< 0 Math, 1 Hebrew, 2 English, 3 Judaism */
+    int subject_id;                  /**< 0 Math, 1 Hebrew, 2 English, 3 Judaism, 4 Wizard Challenges */
     WizardProfile_t target_profile;  /**< Ori, Ethan, Ayala */
     const char *text;                /**< Question prompt */
     const char *answers[4];          /**< Four multiple-choice options */

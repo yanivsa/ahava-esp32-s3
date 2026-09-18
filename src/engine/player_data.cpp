@@ -4,6 +4,7 @@
  */
 
 #include "player_data.h"
+#include "subjects.h"
 #include "quiz_policy.h"
 #include <Arduino.h>
 #include "nvs_flash.h"
@@ -84,7 +85,7 @@ static bool valid_profile(WizardProfile_t profile) {
 }
 
 static bool valid_subject(int subject_id) {
-    return subject_id >= 0 && subject_id < 4;
+    return ahava_subject_valid(subject_id);
 }
 
 static uint32_t saturating_add(uint32_t a, uint32_t b) {
@@ -98,7 +99,7 @@ static void make_subject_key(char *buf, size_t len, const char *prefix,
 
 static void clear_unsynced_counts(WizardProfile_t profile) {
     char key[16];
-    for (int subject = 0; subject < 4; ++subject) {
+    for (int subject = 0; subject < AHAVA_SUBJECT_COUNT; ++subject) {
         make_subject_key(key, sizeof(key), "uq", profile, subject);
         nvs_write_u32_val(key, 0);
     }
@@ -107,7 +108,7 @@ static void clear_unsynced_counts(WizardProfile_t profile) {
 static uint32_t get_unsynced_total(WizardProfile_t profile) {
     char key[16];
     uint32_t total = 0;
-    for (int subject = 0; subject < 4; ++subject) {
+    for (int subject = 0; subject < AHAVA_SUBJECT_COUNT; ++subject) {
         make_subject_key(key, sizeof(key), "uq", profile, subject);
         total = saturating_add(total, nvs_read_u32_val(key, 0));
     }
@@ -123,7 +124,7 @@ static void reset_daily_counts(WizardProfile_t profile, uint32_t today) {
     snprintf(key, sizeof(key), "qt_%d", (int)profile);
     nvs_write_u32_val(key, 0);
 
-    for (int subject = 0; subject < 4; ++subject) {
+    for (int subject = 0; subject < AHAVA_SUBJECT_COUNT; ++subject) {
         make_subject_key(key, sizeof(key), "qs", profile, subject);
         nvs_write_u32_val(key, 0);
     }
@@ -137,7 +138,7 @@ static void restore_unsynced_counts_for_date(WizardProfile_t profile, uint32_t t
     char key[16];
     uint32_t total = 0;
 
-    for (int subject = 0; subject < 4; ++subject) {
+    for (int subject = 0; subject < AHAVA_SUBJECT_COUNT; ++subject) {
         make_subject_key(key, sizeof(key), "uq", profile, subject);
         const uint32_t unsynced = nvs_read_u32_val(key, 0);
 

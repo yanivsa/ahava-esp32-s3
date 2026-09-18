@@ -4,6 +4,7 @@
  */
 
 #include "screen_manager.h"
+#include "subjects.h"
 #include "theme_manager.h"
 #include "quiz_engine.h"
 #include "player_data.h"
@@ -1225,8 +1226,9 @@ void ui_screen_dashboard_init(lv_obj_t *scr) {
     lv_obj_set_flex_align(scroll, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
 
     /* Generate Age-Tailored Subjects Based on Active Profile */
-    const char* titles[4];
-    const char* emojis[4];
+    const char* titles[AHAVA_SUBJECT_COUNT] = {};
+    const char* emojis[AHAVA_SUBJECT_COUNT] = {};
+    int subject_count = AHAVA_SUBJECT_CHALLENGES;
 
     if (current_profile == PROFILE_AYALA) {
         titles[0] = "צורות ומספרים"; emojis[0] = "🔴";
@@ -1238,6 +1240,8 @@ void ui_screen_dashboard_init(lv_obj_t *scr) {
         titles[1] = "לשון ועברית"; emojis[1] = "📖";
         titles[2] = "אנגלית יסודי"; emojis[2] = "🔤";
         titles[3] = "מסורת ישראל"; emojis[3] = "🕍";
+        titles[AHAVA_SUBJECT_CHALLENGES] = "חִידוֹת הַקּוֹסְמִים"; emojis[AHAVA_SUBJECT_CHALLENGES] = "";
+        subject_count = AHAVA_SUBJECT_COUNT;
     } else {
         titles[0] = "מתמטיקה"; emojis[0] = "📐";
         titles[1] = "הבנת הנקרא ולשון"; emojis[1] = "📚";
@@ -1245,7 +1249,7 @@ void ui_screen_dashboard_init(lv_obj_t *scr) {
         titles[3] = "ישיבת יגל והלכה"; emojis[3] = "📜";
     }
 
-    for (int i = 0; i < 4; i++) {
+    for (int i = 0; i < subject_count; i++) {
         lv_obj_t *card = lv_obj_create(scroll);
         theme_apply_card(card);
         lv_obj_set_size(card, 290, 100);

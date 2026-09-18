@@ -41,9 +41,11 @@ void test_records_correct_answers_by_day_and_subject() {
     weekly_stats_record_correct(&stats, 20260917u, 0);
     weekly_stats_record_correct(&stats, 20260917u, 0);
     weekly_stats_record_correct(&stats, 20260917u, 3);
+    weekly_stats_record_correct(&stats, 20260917u, AHAVA_SUBJECT_CHALLENGES);
 
     TEST_ASSERT_EQUAL_UINT16(2, weekly_stats_get_correct(&stats, 20260917u, 0));
     TEST_ASSERT_EQUAL_UINT16(1, weekly_stats_get_correct(&stats, 20260917u, 3));
+    TEST_ASSERT_EQUAL_UINT16(1, weekly_stats_get_correct(&stats, 20260917u, AHAVA_SUBJECT_CHALLENGES));
     TEST_ASSERT_EQUAL_UINT16(0, weekly_stats_get_correct(&stats, 20260917u, 1));
 }
 
@@ -85,7 +87,7 @@ void test_invalid_subject_or_date_is_ignored() {
 
     weekly_stats_record_correct(&stats, 0u, 0);
     weekly_stats_record_correct(&stats, 20260917u, -1);
-    weekly_stats_record_correct(&stats, 20260917u, 4);
+    weekly_stats_record_correct(&stats, 20260917u, AHAVA_SUBJECT_COUNT);
 
     for (int subject = 0; subject < WEEKLY_STATS_SUBJECTS; ++subject) {
         TEST_ASSERT_EQUAL_UINT16(0, weekly_stats_get_correct(&stats, 20260917u, subject));
