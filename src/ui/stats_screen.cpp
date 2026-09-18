@@ -84,6 +84,37 @@ static void create_text_value(lv_obj_t *parent, int x, int y, int width,
     lv_obj_set_style_base_dir(label, LV_BASE_DIR_LTR, LV_PART_MAIN);
 }
 
+
+static void create_hebrew_value(lv_obj_t *parent, int x, int y, int width,
+                                uint16_t value, bool large) {
+    const lv_font_t *font = large ? &lv_font_hebrew_24 : &lv_font_hebrew_16;
+    const int symbol_w = large ? 24 : 18;
+    const int count_w = large ? 36 : 30;
+    const int gap = 4;
+    const int group_w = symbol_w + gap + count_w;
+    const int start_x = x + (width - group_w) / 2;
+
+    lv_obj_t *symbol = lv_label_create(parent);
+    lv_label_set_text(symbol, "א");
+    lv_obj_set_pos(symbol, start_x, y);
+    lv_obj_set_width(symbol, symbol_w);
+    lv_obj_set_style_text_font(symbol, font, LV_PART_MAIN);
+    lv_obj_set_style_text_color(symbol, lv_color_hex(0x0F172A), LV_PART_MAIN);
+    lv_obj_set_style_text_align(symbol, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
+    lv_obj_set_style_base_dir(symbol, LV_BASE_DIR_RTL, LV_PART_MAIN);
+
+    lv_obj_t *count = lv_label_create(parent);
+    char buf[12];
+    snprintf(buf, sizeof(buf), "%u", (unsigned)value);
+    lv_label_set_text(count, buf);
+    lv_obj_set_pos(count, start_x + symbol_w + gap, y);
+    lv_obj_set_width(count, count_w);
+    lv_obj_set_style_text_font(count, font, LV_PART_MAIN);
+    lv_obj_set_style_text_color(count, lv_color_hex(0x0F172A), LV_PART_MAIN);
+    lv_obj_set_style_text_align(count, LV_TEXT_ALIGN_LEFT, LV_PART_MAIN);
+    lv_obj_set_style_base_dir(count, LV_BASE_DIR_LTR, LV_PART_MAIN);
+}
+
 static void create_star_value(lv_obj_t *parent, int x, int y, int width,
                               uint16_t value, bool large) {
     const int icon_size = large ? 26 : 22;
@@ -142,7 +173,7 @@ static void create_big_subject_values(lv_obj_t *card, const WeeklyStatsDay_t &da
     const int y = 43;
     create_star_value(card, 10, y, 98, day.correct[3], true);
     create_text_value(card, 112, y, 104, "ABC", day.correct[2], true);
-    create_text_value(card, 220, y, 78, "א", day.correct[1], true);
+    create_hebrew_value(card, 220, y, 78, day.correct[1], true);
     create_text_value(card, 304, y, 138, "×÷", day.correct[0], true);
 }
 
@@ -191,7 +222,7 @@ static lv_obj_t *create_compact_day_row(lv_obj_t *parent, int y,
     lv_obj_set_style_base_dir(date_lbl, LV_BASE_DIR_LTR, LV_PART_MAIN);
 
     create_text_value(row, 286, 12, 82, "×÷", day.correct[0], false);
-    create_text_value(row, 222, 12, 60, "א", day.correct[1], false);
+    create_hebrew_value(row, 222, 12, 60, day.correct[1], false);
     create_text_value(row, 116, 12, 102, "ABC", day.correct[2], false);
     create_star_value(row, 12, 12, 98, day.correct[3], false);
     return row;
