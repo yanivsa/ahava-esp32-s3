@@ -179,6 +179,47 @@ static void restore_unsynced_counts_for_date(WizardProfile_t profile, uint32_t t
                   (int)profile, today, (unsigned)total);
 }
 
+static void merge_unsynced_counts_into_current_date(WizardProfile_t profile,
+                                                   uint32_t today) {
+    char key[16];
+    const uint32_t unsynced_total = get_unsynced_total(profile);
+
+    for (int subject = 0; subject < AHAVA_SUBJECT_COUNT; ++subject) {
+        make_subject_key(key, sizeof(key), "uq", profile, subject);
+        const uint32_t delta = nvs_read_u32_val(key, 0);
+        if (delta == 0) continue;
+
+        make_subject_key(key, sizeof(key), "qs", profile, subject);
+        const uint32_t current = nvs_read_u32_val(key, 0);
+        nvs_write_u32_val(key, saturating_add(current, delta));
+    }
+
+    for (int subject = 0; subject < AHAVA_ACADEMIC_SUBJECT_COUNT; ++subject) {
+        make_subject_key(key, sizeof(key), "ua", profile, subject);
+        const uint32_t delta = nvs_read_u32_val(key, 0);
+        if (delta == 0) continue;
+
+        make_subject_key(key, sizeof(key), "qa", profile, subject);
+        uint32_t current = nvs_read_u32_val(key, UINT32_MAX);
+        if (current == UINT32_MAX) {
+            make_subject_key(key, sizeof(key), "qs", profile, subject);
+            current = nvs_read_u32_val(key, 0);
+        }
+        nvs_write_u32_val(key, saturating_add(current, delta));
+    }
+
+    snprintf(key, sizeof(key), "qt_%d", (int)profile);
+    const uint32_t current_total = nvs_read_u32_val(key, 0);
+    nvs_write_u32_val(key, saturating_add(current_total, unsynced_total));
+
+    snprintf(key, sizeof(key), "d_%d", (int)profile);
+    nvs_write_u32_val(key, today);
+    clear_unsynced_counts(profile);
+
+    Serial.printf("[NVS] Profile %d: trusted date %u confirmed; merged %u pre-sync answers into current bucket.\n",
+                  (int)profile, today, (unsigned)unsynced_total);
+}
+
 static void ensure_daily_bucket_for_date(WizardProfile_t profile, uint32_t today) {
     if (!valid_profile(profile) || today == 0) return;
 
@@ -196,12 +237,10 @@ static void ensure_daily_bucket_for_date(WizardProfile_t profile, uint32_t today
         // only the eligible questions counted while the clock was untrusted.
         restore_unsynced_counts_for_date(profile, today);
     } else if (saved_date == today && unsynced_total > 0) {
-        // The clock came back and confirms the same day. The regular counters
-        // already include the unsynced activity, so only the temporary deltas
-        // need to be cleared.
-        clear_unsynced_counts(profile);
-        Serial.printf("[NVS] Profile %d: trusted date confirms current bucket %u.\n",
-                      (int)profile, today);
+        // The clock came back and confirms the persisted bucket is still today.
+        // Answers made before NTP were intentionally kept only in uq/ua, so
+        // merge those deltas into the existing dated bucket exactly once.
+        merge_unsynced_counts_into_current_date(profile, today);
     }
 }
 
