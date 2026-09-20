@@ -142,8 +142,7 @@ static void ui_live_status_timer_cb(lv_timer_t *timer) {
         time_service_format_now(now_buf, sizeof(now_buf));
         time_service_format_last_sync(sync_buf, sizeof(sync_buf));
         snprintf(time_buf, sizeof(time_buf),
-                 "תאריך ושעה: %s
-מצב: %s | סנכרון אחרון: %s",
+                 "תאריך ושעה: %s\nמצב: %s | סנכרון אחרון: %s",
                  now_buf, time_service_state_label_he(), sync_buf);
         lv_label_set_text(s_active_sys_time_info, time_buf);
     }
