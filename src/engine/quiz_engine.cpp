@@ -58,8 +58,8 @@ static bool selectable_for_profile(size_t index, const Question_t *q,
     if (profile == PROFILE_ORI && q->subject_id == 3 && index < BASE_QUESTION_COUNT) {
         return false;
     }
-    /* Ori's Math world uses the 1000+ Grade 8 math bank only (replacing the 65 old questions). */
-    if (profile == PROFILE_ORI && q->subject_id == 0 && index < BASE_QUESTION_COUNT) {
+    /* Ori's Math world uses the 1000+ Grade 8 math bank and gifted quantitative questions. */
+    if (profile == PROFILE_ORI && q->subject_id == 0 && index < BASE_QUESTION_COUNT && q->id < 3000) {
         return false;
     }
     return true;
