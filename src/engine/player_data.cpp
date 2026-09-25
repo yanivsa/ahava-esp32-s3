@@ -6,6 +6,8 @@
 #include "player_data.h"
 #include "subjects.h"
 #include "quiz_policy.h"
+#include "time_service.h"
+#include "weekly_stats_store.h"
 #include <Arduino.h>
 #include "nvs_flash.h"
 #include "nvs.h"
@@ -15,7 +17,6 @@
 #include <time.h>
 
 #define NVS_STORAGE_NAMESPACE "wizard_nvs"
-#define ISRAEL_TZ "IST-2IDT,M3.4.4/26,M10.5.0"
 #define RETRY_MAX_QUESTIONS 256
 #define RETRY_WORDS (RETRY_MAX_QUESTIONS / 32)
 
@@ -178,6 +179,47 @@ static void restore_unsynced_counts_for_date(WizardProfile_t profile, uint32_t t
                   (int)profile, today, (unsigned)total);
 }
 
+static void merge_unsynced_counts_into_current_date(WizardProfile_t profile,
+                                                   uint32_t today) {
+    char key[16];
+    const uint32_t unsynced_total = get_unsynced_total(profile);
+
+    for (int subject = 0; subject < AHAVA_SUBJECT_COUNT; ++subject) {
+        make_subject_key(key, sizeof(key), "uq", profile, subject);
+        const uint32_t delta = nvs_read_u32_val(key, 0);
+        if (delta == 0) continue;
+
+        make_subject_key(key, sizeof(key), "qs", profile, subject);
+        const uint32_t current = nvs_read_u32_val(key, 0);
+        nvs_write_u32_val(key, saturating_add(current, delta));
+    }
+
+    for (int subject = 0; subject < AHAVA_ACADEMIC_SUBJECT_COUNT; ++subject) {
+        make_subject_key(key, sizeof(key), "ua", profile, subject);
+        const uint32_t delta = nvs_read_u32_val(key, 0);
+        if (delta == 0) continue;
+
+        make_subject_key(key, sizeof(key), "qa", profile, subject);
+        uint32_t current = nvs_read_u32_val(key, UINT32_MAX);
+        if (current == UINT32_MAX) {
+            make_subject_key(key, sizeof(key), "qs", profile, subject);
+            current = nvs_read_u32_val(key, 0);
+        }
+        nvs_write_u32_val(key, saturating_add(current, delta));
+    }
+
+    snprintf(key, sizeof(key), "qt_%d", (int)profile);
+    const uint32_t current_total = nvs_read_u32_val(key, 0);
+    nvs_write_u32_val(key, saturating_add(current_total, unsynced_total));
+
+    snprintf(key, sizeof(key), "d_%d", (int)profile);
+    nvs_write_u32_val(key, today);
+    clear_unsynced_counts(profile);
+
+    Serial.printf("[NVS] Profile %d: trusted date %u confirmed; merged %u pre-sync answers into current bucket.\n",
+                  (int)profile, today, (unsigned)unsynced_total);
+}
+
 static void ensure_daily_bucket_for_date(WizardProfile_t profile, uint32_t today) {
     if (!valid_profile(profile) || today == 0) return;
 
@@ -195,12 +237,10 @@ static void ensure_daily_bucket_for_date(WizardProfile_t profile, uint32_t today
         // only the eligible questions counted while the clock was untrusted.
         restore_unsynced_counts_for_date(profile, today);
     } else if (saved_date == today && unsynced_total > 0) {
-        // The clock came back and confirms the same day. The regular counters
-        // already include the unsynced activity, so only the temporary deltas
-        // need to be cleared.
-        clear_unsynced_counts(profile);
-        Serial.printf("[NVS] Profile %d: trusted date confirms current bucket %u.\n",
-                      (int)profile, today);
+        // The clock came back and confirms the persisted bucket is still today.
+        // Answers made before NTP were intentionally kept only in uq/ua, so
+        // merge those deltas into the existing dated bucket exactly once.
+        merge_unsynced_counts_into_current_date(profile, today);
     }
 }
 
@@ -272,29 +312,24 @@ void player_data_add_xp(WizardProfile_t profile, uint32_t amount) {
 }
 
 void player_data_sync_time(void) {
-    Serial.println("[TIME] Configuring SNTP for Israel timezone...");
-    configTzTime(ISRAEL_TZ, "pool.ntp.org", "time.google.com");
+    time_service_request_sync();
 }
 
 bool player_data_is_time_synced(void) {
-    time_t now = time(NULL);
-    struct tm timeinfo;
-    return localtime_r(&now, &timeinfo) != NULL && (timeinfo.tm_year + 1900 >= 2025);
+    return time_service_has_trusted_time();
 }
 
 uint32_t player_data_get_current_date(void) {
-    time_t now = time(NULL);
-    struct tm timeinfo;
-    if (localtime_r(&now, &timeinfo) != NULL && (timeinfo.tm_year + 1900 >= 2025)) {
-        return (uint32_t)((timeinfo.tm_year + 1900) * 10000 +
-                          (timeinfo.tm_mon + 1) * 100 + timeinfo.tm_mday);
-    }
-    return 0;
+    return time_service_today_id();
 }
 
 uint32_t player_data_get_questions_today(WizardProfile_t profile) {
     if (!valid_profile(profile)) return 0;
-    ensure_daily_bucket(profile);
+    const uint32_t today = player_data_get_current_date();
+    if (today == 0) {
+        return get_unsynced_total(profile);
+    }
+    ensure_daily_bucket_for_date(profile, today);
 
     char key[16];
     snprintf(key, sizeof(key), "qt_%d", (int)profile);
@@ -303,9 +338,15 @@ uint32_t player_data_get_questions_today(WizardProfile_t profile) {
 
 uint32_t player_data_get_subject_questions_today(WizardProfile_t profile, int subject_id) {
     if (!valid_profile(profile) || !valid_subject(subject_id)) return 0;
-    ensure_daily_bucket(profile);
+    const uint32_t today = player_data_get_current_date();
 
     char key[16];
+    if (today == 0) {
+        make_subject_key(key, sizeof(key), "uq", profile, subject_id);
+        return nvs_read_u32_val(key, 0);
+    }
+
+    ensure_daily_bucket_for_date(profile, today);
     make_subject_key(key, sizeof(key), "qs", profile, subject_id);
     return nvs_read_u32_val(key, 0);
 }
@@ -334,26 +375,54 @@ uint32_t player_data_increment_questions_today(WizardProfile_t profile) {
     const int subject_id = pending_count_subject;
     const int stats_subject_id = pending_count_stats_subject;
 
-    // Consume the gate exactly once, regardless of outcome.
     pending_count_valid = false;
     pending_count_eligible = false;
     pending_count_profile = PROFILE_NONE;
     pending_count_subject = -1;
     pending_count_stats_subject = -1;
 
-    char total_key[16];
-    snprintf(total_key, sizeof(total_key), "qt_%d", (int)profile);
-    const uint32_t current_total = nvs_read_u32_val(total_key, 0);
+    uint32_t current_total = (count_date == 0) ? get_unsynced_total(profile) : 0;
+    if (count_date != 0) {
+        char total_key[16];
+        snprintf(total_key, sizeof(total_key), "qt_%d", (int)profile);
+        current_total = nvs_read_u32_val(total_key, 0);
+    }
+
     if (!can_count) {
         Serial.printf("[NVS] Profile %d: finalized answer not counted (not first-try correct).\n",
                       (int)profile);
         return current_total;
     }
 
+    const uint32_t limit = quiz_policy_daily_limit((int)profile, subject_id);
+
+    if (count_date == 0) {
+        char unsynced_key[16];
+        make_subject_key(unsynced_key, sizeof(unsynced_key), "uq", profile, subject_id);
+        const uint32_t unsynced_subject = nvs_read_u32_val(unsynced_key, 0);
+        if (limit != UINT32_MAX && unsynced_subject >= limit) return current_total;
+        nvs_write_u32_val(unsynced_key, saturating_add(unsynced_subject, 1));
+
+        char academic_unsynced_key[16];
+        make_subject_key(academic_unsynced_key, sizeof(academic_unsynced_key),
+                         "ua", profile, stats_subject_id);
+        const uint32_t academic_unsynced =
+            nvs_read_u32_val(academic_unsynced_key, 0);
+        nvs_write_u32_val(academic_unsynced_key, saturating_add(academic_unsynced, 1));
+
+        const uint32_t next_unsynced_total = get_unsynced_total(profile);
+        Serial.printf("[NVS] Profile %d subject %d/stats %d: counted with unknown date -> unsynced total=%u.\n",
+                      (int)profile, subject_id, stats_subject_id,
+                      (unsigned)next_unsynced_total);
+        return next_unsynced_total;
+    }
+
+    char total_key[16];
+    snprintf(total_key, sizeof(total_key), "qt_%d", (int)profile);
+
     char subject_key[16];
     make_subject_key(subject_key, sizeof(subject_key), "qs", profile, subject_id);
     const uint32_t subject_count = nvs_read_u32_val(subject_key, 0);
-    const uint32_t limit = quiz_policy_daily_limit((int)profile, subject_id);
     if (limit != UINT32_MAX && subject_count >= limit) {
         Serial.printf("[NVS] Profile %d subject %d: daily limit %u already reached.\n",
                       (int)profile, subject_id, (unsigned)limit);
@@ -369,26 +438,6 @@ uint32_t player_data_increment_questions_today(WizardProfile_t profile) {
         academic_count = nvs_read_u32_val(legacy_key, 0);
     }
 
-    if (count_date == 0) {
-        // Track exactly how many eligible answers occurred while the date was
-        // untrusted. If SNTP later reveals a new date, these deltas survive
-        // the rollover instead of being erased or mixed with the old day.
-        char unsynced_key[16];
-        make_subject_key(unsynced_key, sizeof(unsynced_key), "uq", profile, subject_id);
-        const uint32_t unsynced = nvs_read_u32_val(unsynced_key, 0);
-        nvs_write_u32_val(unsynced_key, saturating_add(unsynced, 1));
-
-        char academic_unsynced_key[16];
-        make_subject_key(academic_unsynced_key, sizeof(academic_unsynced_key), "ua", profile, stats_subject_id);
-        uint32_t academic_unsynced = nvs_read_u32_val(academic_unsynced_key, UINT32_MAX);
-        if (academic_unsynced == UINT32_MAX) {
-            char legacy_unsynced_key[16];
-            make_subject_key(legacy_unsynced_key, sizeof(legacy_unsynced_key), "uq", profile, stats_subject_id);
-            academic_unsynced = nvs_read_u32_val(legacy_unsynced_key, 0);
-        }
-        nvs_write_u32_val(academic_unsynced_key, saturating_add(academic_unsynced, 1));
-    }
-
     const uint32_t next_total = saturating_add(current_total, 1);
     nvs_write_u32_val(total_key, next_total);
 
@@ -398,10 +447,11 @@ uint32_t player_data_increment_questions_today(WizardProfile_t profile) {
     const uint32_t next_academic = saturating_add(academic_count, 1);
     nvs_write_u32_val(academic_key, next_academic);
 
-    Serial.printf("[NVS] Profile %d subject %d/stats %d: first-try correct -> total=%u subject=%u stats=%u%s.\n",
-                  (int)profile, subject_id, stats_subject_id,
-                  (unsigned)next_total, (unsigned)next_subject, (unsigned)next_academic,
-                  count_date == 0 ? " (date unsynced)" : "");
+    weekly_stats_store_record_correct(profile, count_date, stats_subject_id);
+
+    Serial.printf("[NVS] Profile %d subject %d/stats %d: first-try correct -> date=%u total=%u subject=%u stats=%u.\n",
+                  (int)profile, subject_id, stats_subject_id, (unsigned)count_date,
+                  (unsigned)next_total, (unsigned)next_subject, (unsigned)next_academic);
     return next_total;
 }
 
@@ -498,6 +548,7 @@ void player_data_reset_all(void) {
         pending_count_eligible = false;
         pending_count_profile = PROFILE_NONE;
         pending_count_subject = -1;
+        pending_count_stats_subject = -1;
         Serial.println("[NVS] All wizard profiles reset to 0.");
     }
 }

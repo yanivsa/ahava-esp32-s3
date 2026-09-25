@@ -14,6 +14,7 @@
 #include "quiz_engine.h"
 #include "player_data.h"
 #include "weekly_stats_store.h"
+#include "time_service.h"
 #include "audio_manager.h"
 #include "ota_manager.h"
 #include "hal_battery.h"
@@ -150,8 +151,11 @@ void setup() {
     const bool player_data_ready = player_data_init();
     if (!player_data_ready) {
         Serial.println("[SYS] WARN: NVS initialization encountered an issue.");
-    } else if (!weekly_stats_store_init()) {
-        Serial.println("[SYS] WARN: Weekly statistics history could not be fully initialized.");
+    } else {
+        time_service_init();
+        if (!weekly_stats_store_init()) {
+            Serial.println("[SYS] WARN: Weekly statistics history could not be fully initialized.");
+        }
     }
 
     // 2.1. Initialize Hardware Battery & Power Monitor (GPIO 6 / GPIO 7)
@@ -250,6 +254,7 @@ void setup() {
 }
 
 void loop() {
-    // Main Arduino loop yields CPU since GUI, Audio, OTA and background tasks run in FreeRTOS tasks
+    time_service_poll();
+    // Main Arduino loop yields CPU since GUI, Audio, OTA and background tasks run in FreeRTOS tasks.
     vTaskDelay(pdMS_TO_TICKS(1000));
 }

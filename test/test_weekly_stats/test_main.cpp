@@ -105,6 +105,16 @@ void test_previous_date_handles_month_year_and_leap_boundaries() {
 }
 #endif
 
+
+void test_calendar_walk_from_sep_20_to_sep_18() {
+#ifdef AHAVA_HAS_WEEKLY_STATS
+    TEST_ASSERT_EQUAL_UINT32(20260919u, weekly_stats_previous_date(20260920u));
+    TEST_ASSERT_EQUAL_UINT32(20260918u, weekly_stats_previous_date(20260919u));
+#else
+    TEST_FAIL_MESSAGE("calendar helper missing");
+#endif
+}
+
 int main(int argc, char **argv) {
     UNITY_BEGIN();
     RUN_TEST(test_weekly_stats_feature_exists);
@@ -115,6 +125,7 @@ int main(int argc, char **argv) {
     RUN_TEST(test_out_of_order_date_does_not_evict_newer_history);
     RUN_TEST(test_invalid_subject_or_date_is_ignored);
     RUN_TEST(test_previous_date_handles_month_year_and_leap_boundaries);
+    RUN_TEST(test_calendar_walk_from_sep_20_to_sep_18);
 #endif
     return UNITY_END();
 }

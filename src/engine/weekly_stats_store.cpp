@@ -1,5 +1,6 @@
 #include "weekly_stats_store.h"
 #include "player_data.h"
+#include "time_service.h"
 
 #include <Arduino.h>
 #include "nvs.h"
@@ -141,12 +142,33 @@ bool weekly_stats_store_init(void) {
 
 void weekly_stats_store_capture_profile(WizardProfile_t profile) {
     if (!valid_profile(profile)) return;
+
+    // Never merge a stale dated bucket while local time is unknown.
+    if (time_service_today_id() == 0) return;
+
+    // Adopt/rotate the daily bucket first; only then merge it into history.
+    (void)player_data_get_questions_today(profile);
     merge_saved_daily_bucket(profile);
 }
 
 void weekly_stats_store_capture_all(void) {
     for (int p = (int)PROFILE_ORI; p < (int)PROFILE_MAX; ++p) {
         weekly_stats_store_capture_profile((WizardProfile_t)p);
+    }
+}
+
+void weekly_stats_store_record_correct(WizardProfile_t profile,
+                                       uint32_t date,
+                                       int subject_id) {
+    if (!valid_profile(profile) || date == 0 ||
+        subject_id < 0 || subject_id >= WEEKLY_STATS_SUBJECTS) return;
+
+    WeeklyStats_t history{};
+    load_history(profile, &history);
+    weekly_stats_record_correct(&history, date, subject_id);
+    if (!save_history(profile, &history)) {
+        Serial.printf("[STATS] WARN: failed to persist dated answer profile=%d date=%u subject=%d.\n",
+                      (int)profile, (unsigned)date, subject_id);
     }
 }
 
@@ -165,9 +187,9 @@ bool weekly_stats_store_get_last_seven(WizardProfile_t profile,
     WeeklyStats_t history{};
     load_history(profile, &history);
 
-    uint32_t anchor = player_data_get_current_date();
-    if (anchor == 0) anchor = saved_daily_date(profile);
-    if (anchor == 0 && history.days[0].date != 0) anchor = history.days[0].date;
+    // "Today" comes only from a trusted running clock. Persisted dates are
+    // history, never a substitute for the current date.
+    const uint32_t anchor = time_service_today_id();
 
     memset(out_days, 0, sizeof(WeeklyStatsDay_t) * WEEKLY_STATS_DAYS);
     if (anchor == 0) return false;
