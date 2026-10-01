@@ -30,6 +30,9 @@ jobs:
       - name: Run quiz policy tests
         run: pio test -e native
 
+      - name: Verify cloud results contract
+        run: python scripts/verify_results_cloud_contract.py
+
       - name: Build application
         env:
           AHAVA_RESULTS_SYNC_TOKEN: ${{ secrets.AHAVA_RESULTS_SYNC_TOKEN }}

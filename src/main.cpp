@@ -68,10 +68,15 @@ static void enter_power_save_sleep(void) {
     // 2. Mute Audio Amplifier
     audio_set_volume(0);
 
-    // 3. Disconnect and power down Wi-Fi
+    // 3. Best-effort cloud flush while Wi-Fi is still available.
+    // Dirty aggregates remain in NVS if the network is unavailable.
+    results_sync_force();
+    results_sync_poll();
+
+    // 4. Disconnect and power down Wi-Fi
     ota_wifi_disconnect();
 
-    // 4. Calculate time until next 01:00 AM check and enable timer wakeup
+    // 5. Calculate time until next 01:00 AM check and enable timer wakeup
     uint64_t sleep_sec = calculate_seconds_until_night_ota();
     Serial.printf("[POWER] Scheduling next 01:00 AM OTA check in %llu seconds (%llu hours, %llu mins).\n",
                   sleep_sec, sleep_sec / 3600ULL, (sleep_sec % 3600ULL) / 60ULL);
@@ -79,7 +84,7 @@ static void enter_power_save_sleep(void) {
 
     delay(200);
 
-    // 5. Enter Deep Sleep
+    // 6. Enter Deep Sleep
     esp_deep_sleep_start();
 }
 
@@ -180,6 +185,16 @@ void setup() {
         Serial.println("[NIGHT_OTA] Checking for OTA updates silently (screen and audio off)...");
         ota_manager_init();
         ota_perform_silent_check(DEFAULT_OTA_FIRMWARE_URL);
+
+        // Reuse the nightly Wi-Fi window to retry pending learning results.
+        if (ota_is_wifi_connected()) {
+            results_sync_force();
+            for (int i = 0; i < 12; ++i) {
+                time_service_poll();
+                results_sync_poll();
+                delay(250);
+            }
+        }
 
         Serial.println("[NIGHT_OTA] OTA check complete. Returning to Deep Sleep...");
         enter_power_save_sleep();
