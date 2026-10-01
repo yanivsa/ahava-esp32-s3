@@ -6,12 +6,15 @@ const projectRoot = path.resolve(path.dirname(new URL(import.meta.url).pathname)
 const ahavaRoot = process.argv[2] ? path.resolve(process.argv[2]) : path.resolve(projectRoot, '../Ahava');
 const questionsPath = path.join(ahavaRoot, 'www/questions.js');
 const sourcePath = path.join(ahavaRoot, 'www/source-questions-2020.js');
+const giftedPath = path.join(ahavaRoot, 'www/gifted-questions.js');
 const outputPath = path.join(projectRoot, 'src/engine/generated_questions.inc');
 
 const context = { console };
 vm.createContext(context);
-const source = `${fs.readFileSync(questionsPath, 'utf8')}\n${fs.readFileSync(sourcePath, 'utf8')}\n` +
-  `globalThis.__banks = { grade2: QUESTIONS_DATABASE_GRADE_2, grade5: QUESTIONS_DATABASE_GRADE_5 };`;
+const source = `${fs.readFileSync(questionsPath, 'utf8')}\n` +
+  `${fs.existsSync(giftedPath) ? fs.readFileSync(giftedPath, 'utf8') : ''}\n` +
+  `${fs.readFileSync(sourcePath, 'utf8')}\n` +
+  `globalThis.__banks = { grade2: QUESTIONS_DATABASE_GRADE_2, grade5: QUESTIONS_DATABASE_GRADE_5, gifted: typeof QUESTIONS_DATABASE_GIFTED !== 'undefined' ? QUESTIONS_DATABASE_GIFTED : [] };`;
 vm.runInContext(source, context, { filename: 'ahava-question-bank.js' });
 
 function cleanText(str) {
@@ -202,6 +205,48 @@ for (const [sub, subId] of Object.entries(subjectsMap)) {
       addRow('PROFILE_ORI', subId, q.text, q.options, q.answer, q.explanation || q.hint);
     }
   }
+}
+
+// 4. ORI - GIFTED EXAM QUESTIONS (Middle School / Stage B)
+const giftedBank = context.__banks.gifted || [];
+let giftedNumericId = 3000;
+for (const q of giftedBank) {
+  if (q.image || !Array.isArray(q.options) || q.options.length < 4) continue;
+
+  let opts = q.options.map(o => cleanText(typeof o === 'string' ? o : o.text));
+  let ansIdx = q.answer;
+
+  // If 5 options, adapt to 4 options (keep correct answer + 3 best distractors)
+  if (opts.length === 5) {
+    const distractors = [0, 1, 2, 3, 4].filter(i => i !== ansIdx);
+    const chosen = [ansIdx, ...distractors.slice(0, 3)].sort((a, b) => a - b);
+    opts = chosen.map(i => opts[i]);
+    ansIdx = chosen.indexOf(ansIdx);
+  }
+
+  if (opts.length !== 4) continue;
+
+  let subId = 1; // Default to Hebrew
+  if (q.domain === 'quantitative') {
+    subId = 0; // Math
+  } else if (q.domain === 'english') {
+    subId = 2; // English
+  } else if (q.domain === 'verbal' || q.domain === 'logic') {
+    subId = 1; // Hebrew
+  }
+
+  const currentId = giftedNumericId++;
+  addRow(
+    'PROFILE_ORI',
+    subId,
+    q.text,
+    opts,
+    ansIdx,
+    q.explanation || 'התשובה נבדקה מול מאגר מחוננים.',
+    q.hint || 'חשבו על הכלל או הקשר המרכזי בשאלה.',
+    currentId,
+    subId
+  );
 }
 
 const generated = `// Generated from Ahava database by scripts/generate_embedded_questions.mjs. Do not edit manually.\n` +
