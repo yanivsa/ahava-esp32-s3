@@ -15,6 +15,7 @@
 #include "player_data.h"
 #include "weekly_stats_store.h"
 #include "time_service.h"
+#include "results_sync.h"
 #include "audio_manager.h"
 #include "ota_manager.h"
 #include "hal_battery.h"
@@ -255,6 +256,7 @@ void setup() {
 
 void loop() {
     time_service_poll();
+    results_sync_poll();
     // Main Arduino loop yields CPU since GUI, Audio, OTA and background tasks run in FreeRTOS tasks.
     vTaskDelay(pdMS_TO_TICKS(1000));
 }

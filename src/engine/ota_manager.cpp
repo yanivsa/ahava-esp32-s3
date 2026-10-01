@@ -5,6 +5,7 @@
 
 #include "ota_manager.h"
 #include "time_service.h"
+#include "results_sync.h"
 #include <Arduino.h>
 #include <WiFi.h>
 #include <WiFiManager.h>
@@ -78,6 +79,7 @@ bool ota_manager_init(void) {
                           WiFi.localIP().toString().c_str());
             time_service_set_network_connected(true);
             time_service_request_sync();
+            results_sync_force();
         } else if (event == ARDUINO_EVENT_WIFI_STA_DISCONNECTED) {
             time_service_set_network_connected(false);
         }
@@ -148,6 +150,7 @@ bool ota_wifi_connect(const char *ssid, const char *pass, uint32_t timeout_ms) {
                       WiFi.localIP().toString().c_str(), WiFi.RSSI());
         time_service_set_network_connected(true);
         time_service_request_sync();
+        results_sync_force();
         current_status = OTA_STATUS_IDLE;
         return true;
     } else {
