@@ -17,6 +17,9 @@ for token in [
 
 assert "CREATE TABLE IF NOT EXISTS learning_results_daily" not in schema
 assert "INSERT INTO learning_results_device_daily" in worker
+assert "async function creditDeviceAggregate" in worker
+assert "learning_reward_credits" in worker
+assert "minutesCredited" in worker
 assert "INSERT INTO learning_results_daily" not in worker
 assert "'ahava_device'" in worker
 assert "WiFi.setAutoReconnect(true)" in ota

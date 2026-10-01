@@ -37,6 +37,56 @@ function normalizeResult(item) {
   return { profileKey, activityDate, subject, correctFirstTry, sourceRevision };
 }
 
+async function creditDeviceAggregate(env, result) {
+  const noonUtcMs = Date.parse(result.activityDate + "T12:00:00Z");
+  if (!Number.isFinite(noonUtcMs)) return 0;
+
+  const link = await env.RESULTS_DB
+    .prepare("SELECT child_id, family_id, enabled_from_ms FROM learning_profile_links WHERE profile_key = ?")
+    .bind(result.profileKey)
+    .first();
+
+  if (!link || noonUtcMs < Number(link.enabled_from_ms)) return 0;
+
+  let credited = 0;
+  for (let ordinal = 1; ordinal <= result.correctFirstTry; ordinal++) {
+    const syncId = [
+      "ahava_device",
+      result.profileKey,
+      result.activityDate,
+      result.subject,
+      String(ordinal),
+    ].join(":");
+
+    const txId = "academy:" + syncId;
+    const questionId = "device:" + result.subject + ":" + ordinal;
+
+    const write = await env.RESULTS_DB
+      .prepare(`
+        INSERT OR IGNORE INTO learning_reward_credits (
+          sync_id, profile_key, child_id, family_id, subject, question_id,
+          question_timestamp_ms, activity_date, transaction_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `)
+      .bind(
+        syncId,
+        result.profileKey,
+        link.child_id,
+        link.family_id,
+        result.subject,
+        questionId,
+        noonUtcMs + ordinal,
+        result.activityDate,
+        txId
+      )
+      .run();
+
+    if (Number(write?.meta?.changes || 0) > 0) credited += 1;
+  }
+
+  return credited;
+}
+
 async function handleBatch(request, env) {
   if (!authorized(request, env)) return json({ error: "unauthorized" }, 401);
   if (!env.RESULTS_DB) return json({ error: "database_unavailable" }, 503);
@@ -76,10 +126,17 @@ async function handleBatch(request, env) {
   );
 
   await env.RESULTS_DB.batch(statements);
+
+  let minutesCredited = 0;
+  for (const result of normalized) {
+    minutesCredited += await creditDeviceAggregate(env, result);
+  }
+
   return json({
     ok: true,
     source: "ahava_device",
     accepted: normalized.length,
+    minutesCredited,
     serverTime: new Date().toISOString(),
   });
 }
