@@ -71,9 +71,9 @@ static bool build_payload(const ResultSyncRecord_t *records,
     if (!records || count == 0 || !payload) return false;
     payload->remove(0);
     payload->reserve(7600);
-    payload->concat("{"deviceId":"");
+    payload->concat(R"({"deviceId":")");
     payload->concat(device_id());
-    payload->concat("","results":[");
+    payload->concat(R"(","results":[)");
 
     for (size_t i = 0; i < count; ++i) {
         const char *pkey = results_sync_profile_key_from_id((int)records[i].profile);
@@ -81,15 +81,15 @@ static bool build_payload(const ResultSyncRecord_t *records,
         if (!pkey || !skey) return false;
 
         if (i != 0) payload->concat(',');
-        payload->concat("{"profileKey":"");
+        payload->concat(R"({"profileKey":")");
         payload->concat(pkey);
-        payload->concat("","activityDate":"");
+        payload->concat(R"(","activityDate":")");
         payload->concat(format_date(records[i].date));
-        payload->concat("","subject":"");
+        payload->concat(R"(","subject":")");
         payload->concat(skey);
-        payload->concat("","correctFirstTry":");
+        payload->concat(R"(","correctFirstTry":)");
         payload->concat(String((unsigned)records[i].correct_first_try));
-        payload->concat(","sourceRevision":");
+        payload->concat(R"(,"sourceRevision":)");
         payload->concat(String((unsigned)records[i].correct_first_try));
         payload->concat('}');
     }
