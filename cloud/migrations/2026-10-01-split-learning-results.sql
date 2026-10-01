@@ -1,6 +1,4 @@
--- Final-state schema for Ahava learning results.
--- For an existing legacy learning_results_daily table, run the one-time migration first.
-
+-- One-time migration: split legacy source-tagged results into two physical tables.
 CREATE TABLE IF NOT EXISTS learning_results_device_daily (
   profile_key TEXT NOT NULL CHECK (profile_key IN ('ori','eitan')),
   activity_date TEXT NOT NULL,
@@ -12,9 +10,6 @@ CREATE TABLE IF NOT EXISTS learning_results_device_daily (
   PRIMARY KEY (profile_key, activity_date, subject)
 );
 
-CREATE INDEX IF NOT EXISTS idx_learning_results_device_profile_date
-  ON learning_results_device_daily (profile_key, activity_date DESC);
-
 CREATE TABLE IF NOT EXISTS learning_results_app_daily (
   profile_key TEXT NOT NULL CHECK (profile_key IN ('ori','eitan')),
   activity_date TEXT NOT NULL,
@@ -25,10 +20,37 @@ CREATE TABLE IF NOT EXISTS learning_results_app_daily (
   PRIMARY KEY (profile_key, activity_date, subject)
 );
 
+INSERT INTO learning_results_device_daily
+  (profile_key, activity_date, subject, correct_first_try, device_id, source_revision, updated_at)
+SELECT profile_key, activity_date, subject, correct_first_try,
+       COALESCE(device_id, 'legacy-device'), source_revision, updated_at
+FROM learning_results_daily
+WHERE source='ahava_device'
+ON CONFLICT(profile_key, activity_date, subject) DO UPDATE SET
+  correct_first_try = MAX(learning_results_device_daily.correct_first_try, excluded.correct_first_try),
+  device_id = excluded.device_id,
+  source_revision = MAX(learning_results_device_daily.source_revision, excluded.source_revision),
+  updated_at = MAX(learning_results_device_daily.updated_at, excluded.updated_at);
+
+INSERT INTO learning_results_app_daily
+  (profile_key, activity_date, subject, correct_first_try, source_revision, updated_at)
+SELECT profile_key, activity_date, subject, correct_first_try, source_revision, updated_at
+FROM learning_results_daily
+WHERE source='ahava_app'
+ON CONFLICT(profile_key, activity_date, subject) DO UPDATE SET
+  correct_first_try = MAX(learning_results_app_daily.correct_first_try, excluded.correct_first_try),
+  source_revision = MAX(learning_results_app_daily.source_revision, excluded.source_revision),
+  updated_at = MAX(learning_results_app_daily.updated_at, excluded.updated_at);
+
+DROP VIEW IF EXISTS learning_results_combined_daily;
+ALTER TABLE learning_results_daily RENAME TO learning_results_daily_legacy_20261001;
+
+CREATE INDEX IF NOT EXISTS idx_learning_results_device_profile_date
+  ON learning_results_device_daily (profile_key, activity_date DESC);
 CREATE INDEX IF NOT EXISTS idx_learning_results_app_profile_date
   ON learning_results_app_daily (profile_key, activity_date DESC);
 
-CREATE VIEW IF NOT EXISTS learning_results_daily AS
+CREATE VIEW learning_results_daily AS
 SELECT profile_key, activity_date, 'ahava_device' AS source, subject,
        correct_first_try, device_id, source_revision, updated_at
 FROM learning_results_device_daily
@@ -37,7 +59,7 @@ SELECT profile_key, activity_date, 'ahava_app' AS source, subject,
        correct_first_try, NULL AS device_id, source_revision, updated_at
 FROM learning_results_app_daily;
 
-CREATE VIEW IF NOT EXISTS learning_results_combined_daily AS
+CREATE VIEW learning_results_combined_daily AS
 SELECT
   profile_key,
   activity_date,
@@ -48,3 +70,5 @@ SELECT
   MAX(updated_at) AS updated_at
 FROM learning_results_daily
 GROUP BY profile_key, activity_date, subject;
+
+DROP TABLE learning_results_daily_legacy_20261001;

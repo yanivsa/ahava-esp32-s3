@@ -109,13 +109,13 @@ async function handleBatch(request, env) {
   }
 
   const sql = [
-    "INSERT INTO learning_results_daily",
-    "(profile_key, activity_date, source, subject, correct_first_try, device_id, source_revision, updated_at)",
-    "VALUES (?1, ?2, 'ahava_device', ?3, ?4, ?5, ?6, strftime('%Y-%m-%dT%H:%M:%fZ','now'))",
-    "ON CONFLICT(profile_key, activity_date, source, subject) DO UPDATE SET",
-    "correct_first_try = MAX(learning_results_daily.correct_first_try, excluded.correct_first_try),",
+    "INSERT INTO learning_results_device_daily",
+    "(profile_key, activity_date, subject, correct_first_try, device_id, source_revision, updated_at)",
+    "VALUES (?1, ?2, ?3, ?4, ?5, ?6, strftime('%Y-%m-%dT%H:%M:%fZ','now'))",
+    "ON CONFLICT(profile_key, activity_date, subject) DO UPDATE SET",
+    "correct_first_try = MAX(learning_results_device_daily.correct_first_try, excluded.correct_first_try),",
     "device_id = excluded.device_id,",
-    "source_revision = MAX(learning_results_daily.source_revision, excluded.source_revision),",
+    "source_revision = MAX(learning_results_device_daily.source_revision, excluded.source_revision),",
     "updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')"
   ].join(" ");
 
