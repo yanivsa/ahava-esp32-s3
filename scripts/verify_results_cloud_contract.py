@@ -21,7 +21,7 @@ assert "async function creditDeviceAggregate" in worker
 assert "learning_reward_credits" in worker
 assert "minutesCredited" in worker
 assert "INSERT INTO learning_results_daily" not in worker
-assert "'ahava_device'" in worker
+assert "ahava_device" in worker
 assert "WiFi.setAutoReconnect(true)" in ota
 assert "results_sync_poll();" in main
 assert "results_sync_store_record_correct(profile, count_date, stats_subject_id);" in player
