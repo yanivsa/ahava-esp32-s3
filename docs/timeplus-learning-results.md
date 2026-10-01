@@ -27,8 +27,17 @@ Authentication uses a bearer token stored as a Cloudflare Worker secret and
 injected into firmware by the GitHub Actions secret AHAVA_RESULTS_SYNC_TOKEN.
 
 The device sends no question IDs and no question text. It sends only daily
-first-try-correct counts for Ori and Eitan. The current firmware snapshot covers
-the latest seven calendar days and is resent safely when needed.
+first-try-correct counts for Ori and Eitan.
+
+Offline durability:
+- The seven-day statistics UI is not the cloud queue.
+- A separate NVS result ledger retains up to 120 calendar days per profile.
+- Each subject/day aggregate carries a dirty bit until the server acknowledges it.
+- Uploads are sent in batches of up to 64 aggregate rows.
+- A successful acknowledgement clears only the exact value that was sent; if a
+  newer answer was recorded while the request was in flight, that row stays dirty.
+- On first use after migration, the current seven-day local history is seeded
+  into the durable ledger so recent pre-upgrade activity can also reach the cloud.
 
 Time+ does not need any firmware API change. Its backend can later read D1
 directly. For source-separated data, read learning_results_daily. For a combined

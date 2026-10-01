@@ -6,6 +6,7 @@
 
 #include "results_sync_config.h"
 #include "results_sync_policy.h"
+#include "results_sync_store.h"
 #include "screen_manager.h"
 #include "time_service.h"
 #include "weekly_stats_store.h"
@@ -17,26 +18,18 @@ namespace {
 
 static constexpr uint32_t MIN_ATTEMPT_INTERVAL_MS = 15000;
 static constexpr uint32_t RETRY_INTERVAL_MS = 60000;
-static constexpr uint32_t RESEND_INTERVAL_MS = 6UL * 60UL * 60UL * 1000UL;
+static constexpr size_t MAX_BATCH_RECORDS = 64;
 
 static uint32_t s_last_attempt_ms = 0;
-static uint32_t s_last_success_ms = 0;
-static uint32_t s_last_success_hash = 0;
 static bool s_force = true;
+static bool s_seeded_recent = false;
 
 extern "C" esp_err_t esp_crt_bundle_attach(void *conf);
 
 static const char *subject_key(int subject) {
-    static const char *NAMES[WEEKLY_STATS_SUBJECTS] = {
-        "math", "hebrew", "english", "religion"
-    };
-    if (subject < 0 || subject >= WEEKLY_STATS_SUBJECTS) return nullptr;
+    static const char *NAMES[4] = {"math", "hebrew", "english", "religion"};
+    if (subject < 0 || subject >= 4) return nullptr;
     return NAMES[subject];
-}
-
-static void append_hash(uint32_t *hash, uint32_t value) {
-    *hash ^= value;
-    *hash *= 16777619u;
 }
 
 static String format_date(uint32_t date) {
@@ -58,62 +51,50 @@ static String device_id(void) {
     return String(buf);
 }
 
-static bool build_payload(String *payload, uint32_t *snapshot_hash, int *record_count) {
-    if (!payload || !snapshot_hash || !record_count) return false;
-
-    payload->remove(0);
-    payload->reserve(7600);
-    *snapshot_hash = 2166136261u;
-    *record_count = 0;
-
-    payload->concat("{\"deviceId\":\"");
-    payload->concat(device_id());
-    payload->concat("\",\"results\":[");
-
-    bool first = true;
+static void seed_recent_history(void) {
+    if (s_seeded_recent) return;
     const WizardProfile_t profiles[] = {PROFILE_ORI, PROFILE_ETHAN};
     for (WizardProfile_t profile : profiles) {
         WeeklyStatsDay_t days[WEEKLY_STATS_DAYS]{};
         if (!weekly_stats_store_get_last_seven(profile, days)) continue;
-
-        const char *pkey = results_sync_profile_key_from_id((int)profile);
-        if (!pkey) continue;
-
         for (int day = 0; day < WEEKLY_STATS_DAYS; ++day) {
             if (days[day].date == 0) continue;
-            for (int subject = 0; subject < WEEKLY_STATS_SUBJECTS; ++subject) {
-                const uint16_t count = days[day].correct[subject];
-                if (count == 0) continue;
-
-                const char *skey = subject_key(subject);
-                if (!skey) continue;
-
-                if (!first) payload->concat(',');
-                first = false;
-
-                payload->concat("{\"profileKey\":\"");
-                payload->concat(pkey);
-                payload->concat("\",\"activityDate\":\"");
-                payload->concat(format_date(days[day].date));
-                payload->concat("\",\"subject\":\"");
-                payload->concat(skey);
-                payload->concat("\",\"correctFirstTry\":");
-                payload->concat(String((unsigned)count));
-                payload->concat(",\"sourceRevision\":");
-                payload->concat(String((unsigned)count));
-                payload->concat('}');
-
-                append_hash(snapshot_hash, (uint32_t)profile);
-                append_hash(snapshot_hash, days[day].date);
-                append_hash(snapshot_hash, (uint32_t)subject);
-                append_hash(snapshot_hash, count);
-                ++(*record_count);
-            }
+            results_sync_store_set_floor(profile, days[day].date, days[day].correct);
         }
     }
+    s_seeded_recent = true;
+}
 
+static bool build_payload(const ResultSyncRecord_t *records,
+                          size_t count,
+                          String *payload) {
+    if (!records || count == 0 || !payload) return false;
+    payload->remove(0);
+    payload->reserve(7600);
+    payload->concat("{"deviceId":"");
+    payload->concat(device_id());
+    payload->concat("","results":[");
+
+    for (size_t i = 0; i < count; ++i) {
+        const char *pkey = results_sync_profile_key_from_id((int)records[i].profile);
+        const char *skey = subject_key(records[i].subject);
+        if (!pkey || !skey) return false;
+
+        if (i != 0) payload->concat(',');
+        payload->concat("{"profileKey":"");
+        payload->concat(pkey);
+        payload->concat("","activityDate":"");
+        payload->concat(format_date(records[i].date));
+        payload->concat("","subject":"");
+        payload->concat(skey);
+        payload->concat("","correctFirstTry":");
+        payload->concat(String((unsigned)records[i].correct_first_try));
+        payload->concat(","sourceRevision":");
+        payload->concat(String((unsigned)records[i].correct_first_try));
+        payload->concat('}');
+    }
     payload->concat("]}");
-    return *record_count > 0;
+    return true;
 }
 
 static bool post_payload(const String &payload) {
@@ -124,10 +105,7 @@ static bool post_payload(const String &payload) {
     config.keep_alive_enable = true;
 
     esp_http_client_handle_t client = esp_http_client_init(&config);
-    if (!client) {
-        Serial.println("[RESULT_SYNC] Failed to initialize HTTPS client.");
-        return false;
-    }
+    if (!client) return false;
 
     const String auth = String("Bearer ") + AHAVA_RESULTS_SYNC_TOKEN;
     esp_http_client_set_method(client, HTTP_METHOD_POST);
@@ -158,42 +136,45 @@ bool results_sync_is_configured(void) {
 
 void results_sync_force(void) {
     s_force = true;
+    s_seeded_recent = false;
 }
 
 void results_sync_poll(void) {
     if (!results_sync_is_configured()) return;
-    if (WiFi.status() != WL_CONNECTED) return;
     if (!time_service_has_trusted_time()) return;
 
+    // Backfill the previous seven days when this firmware first becomes active,
+    // or after a delayed clock sync. Future answers are written directly to the
+    // durable ledger and therefore survive much longer offline.
+    seed_recent_history();
+
+    if (WiFi.status() != WL_CONNECTED) return;
+
     const uint32_t now = millis();
-    const uint32_t since_attempt = now - s_last_attempt_ms;
-    if (s_last_attempt_ms != 0 && since_attempt < MIN_ATTEMPT_INTERVAL_MS) return;
+    if (!s_force && s_last_attempt_ms != 0 &&
+        (now - s_last_attempt_ms) < RETRY_INTERVAL_MS) return;
+    if (s_last_attempt_ms != 0 &&
+        (now - s_last_attempt_ms) < MIN_ATTEMPT_INTERVAL_MS) return;
+
+    ResultSyncRecord_t records[MAX_BATCH_RECORDS]{};
+    const size_t count = results_sync_store_collect_dirty(records, MAX_BATCH_RECORDS);
+    if (count == 0) {
+        s_force = false;
+        return;
+    }
 
     String payload;
-    uint32_t snapshot_hash = 0;
-    int record_count = 0;
-    if (!build_payload(&payload, &snapshot_hash, &record_count)) return;
-
-    const bool unchanged = snapshot_hash == s_last_success_hash;
-    if (!s_force && unchanged && s_last_success_ms != 0 &&
-        (now - s_last_success_ms) < RESEND_INTERVAL_MS) {
-        return;
-    }
-
-    if (s_last_attempt_ms != 0 && !unchanged &&
-        since_attempt < RETRY_INTERVAL_MS && s_last_success_hash != 0) {
-        return;
-    }
+    if (!build_payload(records, count, &payload)) return;
 
     s_last_attempt_ms = now;
-    Serial.printf("[RESULT_SYNC] Uploading %d daily aggregate rows.\n", record_count);
+    Serial.printf("[RESULT_SYNC] Uploading %u pending daily aggregate rows.\n",
+                  (unsigned)count);
 
     if (post_payload(payload)) {
-        s_last_success_hash = snapshot_hash;
-        s_last_success_ms = now;
-        s_force = false;
-        Serial.println("[RESULT_SYNC] Cloud snapshot accepted.");
+        results_sync_store_ack(records, count);
+        s_force = true; // Immediately allow the next batch if more than 64 rows remain.
+        Serial.println("[RESULT_SYNC] Cloud batch accepted.");
     } else {
-        s_force = true;
+        s_force = false;
     }
 }

@@ -8,6 +8,7 @@
 #include "quiz_policy.h"
 #include "time_service.h"
 #include "weekly_stats_store.h"
+#include "results_sync_store.h"
 #include <Arduino.h>
 #include "nvs_flash.h"
 #include "nvs.h"
@@ -448,6 +449,7 @@ uint32_t player_data_increment_questions_today(WizardProfile_t profile) {
     nvs_write_u32_val(academic_key, next_academic);
 
     weekly_stats_store_record_correct(profile, count_date, stats_subject_id);
+    results_sync_store_record_correct(profile, count_date, stats_subject_id);
 
     Serial.printf("[NVS] Profile %d subject %d/stats %d: first-try correct -> date=%u total=%u subject=%u stats=%u.\n",
                   (int)profile, subject_id, stats_subject_id, (unsigned)count_date,
