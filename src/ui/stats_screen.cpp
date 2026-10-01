@@ -16,6 +16,9 @@ namespace {
 static lv_timer_t *s_stats_timer = nullptr;
 static lv_obj_t *s_stats_card = nullptr;
 static lv_obj_t *s_overlay = nullptr;
+static lv_obj_t *s_stats_content = nullptr;
+static uint32_t s_stats_signature = 0;
+static bool s_stats_has_date = false;
 static bool s_stats_landscape = false;
 
 static constexpr int STATS_SCREEN_W = 480;
@@ -228,6 +231,64 @@ static lv_obj_t *create_compact_day_row(lv_obj_t *parent, int y,
     return row;
 }
 
+static uint32_t stats_snapshot_signature(const WeeklyStatsDay_t days[WEEKLY_STATS_DAYS],
+                                        bool has_date) {
+    uint32_t hash = has_date ? 2166136261u : 0u;
+    if (!has_date) return hash;
+    for (int day = 0; day < WEEKLY_STATS_DAYS; ++day) {
+        hash = (hash ^ days[day].date) * 16777619u;
+        for (int subject = 0; subject < WEEKLY_STATS_SUBJECTS; ++subject) {
+            hash = (hash ^ days[day].correct[subject]) * 16777619u;
+        }
+    }
+    return hash;
+}
+
+static void refresh_stats_overlay(bool force) {
+    if (!s_stats_content || !lv_obj_is_valid(s_stats_content) ||
+        current_profile == PROFILE_NONE) return;
+
+    WeeklyStatsDay_t days[WEEKLY_STATS_DAYS]{};
+    const bool has_date = weekly_stats_store_get_last_seven(current_profile, days);
+    const uint32_t signature = stats_snapshot_signature(days, has_date);
+    if (!force && signature == s_stats_signature && has_date == s_stats_has_date) return;
+
+    s_stats_signature = signature;
+    s_stats_has_date = has_date;
+    lv_obj_clean(s_stats_content);
+
+    if (!has_date) {
+        lv_obj_t *empty = lv_label_create(s_stats_content);
+        lv_label_set_text(empty,
+            "ממתין לסנכרון השעה\nהיסטוריה קיימת נשמרת ולא תוצג כ״היום״ עד שהתאריך יאומת");
+        lv_obj_set_width(empty, 420);
+        lv_label_set_long_mode(empty, LV_LABEL_LONG_WRAP);
+        lv_obj_set_style_text_font(empty, &lv_font_hebrew_16, LV_PART_MAIN);
+        lv_obj_set_style_text_color(empty, lv_color_hex(0x475569), LV_PART_MAIN);
+        lv_obj_set_style_text_align(empty, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
+        lv_obj_set_style_base_dir(empty, LV_BASE_DIR_RTL, LV_PART_MAIN);
+        lv_obj_align(empty, LV_ALIGN_TOP_MID, 0, 64);
+        return;
+    }
+
+    int y = 0;
+    create_big_day_card(s_stats_content, y, days[0], "היום");
+    y += 86;
+    create_big_day_card(s_stats_content, y, days[1], "אתמול");
+    y += 86;
+
+    for (int i = 2; i < WEEKLY_STATS_DAYS; ++i) {
+        create_compact_day_row(s_stats_content, y, days[i]);
+        y += 50;
+    }
+
+    lv_obj_t *spacer = lv_obj_create(s_stats_content);
+    lv_obj_set_pos(spacer, 0, y);
+    lv_obj_set_size(spacer, 1, 8);
+    clear_obj_style(spacer);
+    lv_obj_remove_flag(spacer, (lv_obj_flag_t)(LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE));
+}
+
 static void restore_stats_orientation(void) {
     if (!s_stats_landscape) return;
     hal_lvgl_set_landscape(false);
@@ -241,6 +302,9 @@ static void close_stats(lv_event_t *e) {
         lv_obj_delete(s_overlay);
     }
     s_overlay = nullptr;
+    s_stats_content = nullptr;
+    s_stats_signature = 0;
+    s_stats_has_date = false;
     restore_stats_orientation();
 }
 
@@ -250,9 +314,6 @@ static void open_stats(lv_event_t *e) {
     audio_play_click();
 
     if (s_overlay && lv_obj_is_valid(s_overlay)) return;
-
-    WeeklyStatsDay_t days[WEEKLY_STATS_DAYS]{};
-    const bool has_date = weekly_stats_store_get_last_seven(current_profile, days);
 
     // This screen is intentionally landscape-only. LVGL's software rotation also
     // rotates pointer coordinates, while the physical panel stays in portrait mode.
@@ -329,38 +390,10 @@ static void open_stats(lv_event_t *e) {
     lv_obj_set_style_bg_opa(content, LV_OPA_50, LV_PART_SCROLLBAR);
     lv_obj_set_style_radius(content, LV_RADIUS_CIRCLE, LV_PART_SCROLLBAR);
 
-    if (!has_date) {
-        lv_obj_t *empty = lv_label_create(content);
-        lv_label_set_text(empty, "הסטטיסטיקה תופיע כאן אחרי סנכרון השעה והתרגול הראשון");
-        lv_obj_set_width(empty, 420);
-        lv_label_set_long_mode(empty, LV_LABEL_LONG_WRAP);
-        lv_obj_set_style_text_font(empty, &lv_font_hebrew_16, LV_PART_MAIN);
-        lv_obj_set_style_text_color(empty, lv_color_hex(0x475569), LV_PART_MAIN);
-        lv_obj_set_style_text_align(empty, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
-        lv_obj_set_style_base_dir(empty, LV_BASE_DIR_RTL, LV_PART_MAIN);
-        lv_obj_align(empty, LV_ALIGN_TOP_MID, 0, 72);
-        lv_obj_move_foreground(s_overlay);
-        return;
-    }
-
-    int y = 0;
-    create_big_day_card(content, y, days[0], "היום");
-    y += 86;
-    create_big_day_card(content, y, days[1], "אתמול");
-    y += 86;
-
-    for (int i = 2; i < WEEKLY_STATS_DAYS; ++i) {
-        create_compact_day_row(content, y, days[i]);
-        y += 50;
-    }
-
-    // Ensure the final row creates enough scroll range without adding visual clutter.
-    lv_obj_t *spacer = lv_obj_create(content);
-    lv_obj_set_pos(spacer, 0, y);
-    lv_obj_set_size(spacer, 1, 8);
-    clear_obj_style(spacer);
-    lv_obj_remove_flag(spacer, (lv_obj_flag_t)(LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE));
-
+    s_stats_content = content;
+    s_stats_signature = 0;
+    s_stats_has_date = false;
+    refresh_stats_overlay(true);
     lv_obj_scroll_to_y(content, 0, LV_ANIM_OFF);
     lv_obj_move_foreground(s_overlay);
 }
@@ -447,9 +480,16 @@ static void stats_timer_cb(lv_timer_t *timer) {
         weekly_stats_store_capture_profile(current_profile);
     }
 
+    if (s_overlay && lv_obj_is_valid(s_overlay)) {
+        refresh_stats_overlay(false);
+    }
+
     if (sm_get_current_screen() != SCREEN_DASHBOARD) {
         s_stats_card = nullptr;
         s_overlay = nullptr;
+        s_stats_content = nullptr;
+        s_stats_signature = 0;
+        s_stats_has_date = false;
         return;
     }
 

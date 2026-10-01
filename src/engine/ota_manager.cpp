@@ -4,7 +4,8 @@
  */
 
 #include "ota_manager.h"
-#include "player_data.h"
+#include "time_service.h"
+#include "results_sync.h"
 #include <Arduino.h>
 #include <WiFi.h>
 #include <WiFiManager.h>
@@ -70,12 +71,17 @@ bool ota_manager_init(void) {
     WiFi.mode(WIFI_STA);
     WiFi.setAutoReconnect(true);
 
-    // Register IP event to synchronize Israel NTP time immediately upon Wi-Fi connection
+    // Keep TimeService informed about connectivity and re-sync on every successful connection.
     WiFi.onEvent([](WiFiEvent_t event, WiFiEventInfo_t info) {
+        (void)info;
         if (event == ARDUINO_EVENT_WIFI_STA_GOT_IP) {
             Serial.printf("[OTA] Wi-Fi connected with IP: %s -> Syncing Israel time...\n",
                           WiFi.localIP().toString().c_str());
-            player_data_sync_time();
+            time_service_set_network_connected(true);
+            time_service_request_sync();
+            results_sync_force();
+        } else if (event == ARDUINO_EVENT_WIFI_STA_DISCONNECTED) {
+            time_service_set_network_connected(false);
         }
     });
 
@@ -98,6 +104,7 @@ bool ota_is_wifi_connected(void) {
 }
 
 void ota_wifi_disconnect(void) {
+    time_service_set_network_connected(false);
     if (WiFi.getMode() != WIFI_OFF) {
         WiFi.disconnect(true);
         WiFi.mode(WIFI_OFF);
@@ -141,7 +148,9 @@ bool ota_wifi_connect(const char *ssid, const char *pass, uint32_t timeout_ms) {
     if (WiFi.status() == WL_CONNECTED) {
         Serial.printf("[OTA] Wi-Fi Connected! IP: %s | RSSI: %d dBm\n", 
                       WiFi.localIP().toString().c_str(), WiFi.RSSI());
-        player_data_sync_time();
+        time_service_set_network_connected(true);
+        time_service_request_sync();
+        results_sync_force();
         current_status = OTA_STATUS_IDLE;
         return true;
     } else {

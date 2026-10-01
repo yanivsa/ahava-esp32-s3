@@ -16,6 +16,11 @@ bool weekly_stats_store_init(void);
 void weekly_stats_store_capture_profile(WizardProfile_t profile);
 void weekly_stats_store_capture_all(void);
 
+/** Persist one first-try correct answer directly under a trusted calendar date. */
+void weekly_stats_store_record_correct(WizardProfile_t profile,
+                                       uint32_t date,
+                                       int subject_id);
+
 /** Load raw retained activity history for a profile. */
 bool weekly_stats_store_get_profile(WizardProfile_t profile, WeeklyStats_t *out_stats);
 

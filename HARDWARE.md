@@ -24,3 +24,11 @@ The physical panel test passed on 2026-08-25, so normal game builds use `0`.
 The `PWR` push button toggles board power. If the USB serial device disappears,
 press `PWR` once. For ROM download mode, hold `BOOT`, connect USB, wait three
 seconds, then release `BOOT`.
+
+## Clock behavior
+
+The firmware does not assume a dedicated battery-backed external RTC. TimeService
+uses SNTP to set the ESP32 system clock whenever Wi-Fi is available; after that,
+the internal running clock continues to provide local Israel time without Wi-Fi.
+After a full power loss, if the system clock is not trustworthy, the UI reports
+the time as unknown and does not label a persisted historical date as "today".

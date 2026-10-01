@@ -10,6 +10,7 @@
 #include "player_data.h"
 #include "audio_manager.h"
 #include "ota_manager.h"
+#include "time_service.h"
 #include "hal_battery.h"
 #include "hal_lvgl.h"
 #include "bsp_config.h"
@@ -72,6 +73,7 @@ static lv_obj_t *s_active_hud_today_lbl = NULL;
 static lv_obj_t *s_active_sys_bat_bar = NULL;
 static lv_obj_t *s_active_sys_bat_info = NULL;
 static lv_obj_t *s_active_sys_wifi_info = NULL;
+static lv_obj_t *s_active_sys_time_info = NULL;
 static lv_obj_t *s_active_sys_vol_lbl = NULL;
 static lv_obj_t *s_active_sys_vol_slider = NULL;
 static lv_timer_t *s_live_status_timer = NULL;
@@ -131,6 +133,18 @@ static void ui_live_status_timer_cb(lv_timer_t *timer) {
                  wifi_connected ? WiFi.localIP().toString().c_str() : "0.0.0.0",
                  WiFi.SSID().length() > 0 ? WiFi.SSID().c_str() : DEFAULT_WIFI_SSID);
         lv_label_set_text(s_active_sys_wifi_info, wifi_buf);
+    }
+
+    if (s_active_sys_time_info && lv_obj_is_valid(s_active_sys_time_info)) {
+        char now_buf[40];
+        char sync_buf[40];
+        char time_buf[224];
+        time_service_format_now(now_buf, sizeof(now_buf));
+        time_service_format_last_sync(sync_buf, sizeof(sync_buf));
+        snprintf(time_buf, sizeof(time_buf),
+                 "תאריך ושעה: %s\nמצב: %s | סנכרון אחרון: %s",
+                 now_buf, time_service_state_label_he(), sync_buf);
+        lv_label_set_text(s_active_sys_time_info, time_buf);
     }
 }
 
@@ -1036,7 +1050,39 @@ void ui_screen_system_init(lv_obj_t *scr) {
     lv_obj_align(wifi_info, LV_ALIGN_TOP_RIGHT, 0, 32);
     s_active_sys_wifi_info = wifi_info;
 
-    /* --- Card 3: OTA Update Trigger --- */
+    /* --- Card 3: Clock & Time Sync Status --- */
+    lv_obj_t *card_time = lv_obj_create(scroll);
+    theme_apply_card(card_time);
+    lv_obj_set_size(card_time, 296, 112);
+    lv_obj_set_style_border_color(card_time, lv_color_hex(0x8B5CF6), LV_PART_MAIN);
+    lv_obj_remove_flag(card_time, LV_OBJ_FLAG_SCROLLABLE);
+
+    lv_obj_t *time_title = lv_label_create(card_time);
+    lv_label_set_text(time_title, "שעון ותאריך");
+    lv_obj_set_style_text_font(time_title, &lv_font_hebrew_24, LV_PART_MAIN);
+    lv_obj_set_style_text_color(time_title, lv_color_hex(0xA78BFA), LV_PART_MAIN);
+    lv_obj_set_style_base_dir(time_title, LV_BASE_DIR_RTL, LV_PART_MAIN);
+    lv_obj_align(time_title, LV_ALIGN_TOP_RIGHT, 0, 0);
+
+    lv_obj_t *time_info = lv_label_create(card_time);
+    char now_buf[40];
+    char sync_buf[40];
+    char time_buf[224];
+    time_service_format_now(now_buf, sizeof(now_buf));
+    time_service_format_last_sync(sync_buf, sizeof(sync_buf));
+    snprintf(time_buf, sizeof(time_buf),
+             "תאריך ושעה: %s\nמצב: %s | סנכרון אחרון: %s",
+             now_buf, time_service_state_label_he(), sync_buf);
+    lv_label_set_text(time_info, time_buf);
+    lv_obj_set_width(time_info, 268);
+    lv_label_set_long_mode(time_info, LV_LABEL_LONG_WRAP);
+    lv_obj_set_style_text_font(time_info, &lv_font_hebrew_16, LV_PART_MAIN);
+    lv_obj_set_style_text_color(time_info, lv_color_hex(0xE2E8F0), LV_PART_MAIN);
+    lv_obj_set_style_base_dir(time_info, LV_BASE_DIR_RTL, LV_PART_MAIN);
+    lv_obj_align(time_info, LV_ALIGN_TOP_RIGHT, 0, 34);
+    s_active_sys_time_info = time_info;
+
+    /* --- Card 4: OTA Update Trigger --- */
     lv_obj_t *card_ota = lv_obj_create(scroll);
     theme_apply_card(card_ota);
     lv_obj_set_size(card_ota, 296, 110);
@@ -1388,6 +1434,7 @@ void sm_load_screen(ScreenID_t screen_id) {
     s_active_sys_bat_bar = NULL;
     s_active_sys_bat_info = NULL;
     s_active_sys_wifi_info = NULL;
+    s_active_sys_time_info = NULL;
     s_active_sys_vol_lbl = NULL;
     s_active_sys_vol_slider = NULL;
 

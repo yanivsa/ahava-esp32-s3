@@ -31,6 +31,8 @@ jobs:
         run: pio test -e native
 
       - name: Build application
+        env:
+          AHAVA_RESULTS_SYNC_TOKEN: ${{ secrets.AHAVA_RESULTS_SYNC_TOKEN }}
         run: pio run -e spotpear-esp32s3-max35
 
       - name: Verify firmware artifact
