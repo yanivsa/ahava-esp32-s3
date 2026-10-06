@@ -23,6 +23,7 @@ typedef enum {
     SCREEN_DASHBOARD,   /**< Main wizard dashboard / spellbook */
     SCREEN_QUIZ,        /**< Quiz / Question screen */
     SCREEN_SYSTEM,      /**< System info, Wi-Fi status and OTA update screen */
+    SCREEN_MUSE,        /**< Magic AI assistant (עוזר קסם) screen */
     SCREEN_COUNT
 } ScreenID_t;
 
@@ -89,6 +90,7 @@ void ui_screen_profiles_init(lv_obj_t *scr);
 void ui_screen_dashboard_init(lv_obj_t *scr);
 void ui_screen_quiz_init(lv_obj_t *scr);
 void ui_screen_system_init(lv_obj_t *scr);
+void ui_screen_muse_init(lv_obj_t *scr);
 
 #ifdef __cplusplus
 }

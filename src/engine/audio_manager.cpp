@@ -29,6 +29,13 @@ static QueueHandle_t audio_queue = NULL;
 static TaskHandle_t audio_task_handle = NULL;
 static uint8_t master_volume = 75; // 75% default volume (clear & audible for children)
 
+#define AUDIO_RECORD_BUFFER_BYTES (16000 * sizeof(int16_t) * 10) // 10 seconds of 16kHz mono = 320 KB
+static uint8_t *s_record_buf = NULL;
+static size_t s_record_bytes = 0;
+static volatile bool s_is_recording = false;
+static volatile bool s_is_playing = false;
+static TaskHandle_t s_record_task_handle = NULL;
+
 /* ========================================================================== */
 /*                         SYNTHESIS & I2S PLAYBACK                           */
 /* ========================================================================== */
@@ -162,6 +169,7 @@ static void audio_task_worker(void *pvParameters) {
     while (1) {
         // Block indefinitely until an audio event is queued
         if (xQueueReceive(audio_queue, &msg, portMAX_DELAY) == pdTRUE) {
+            s_is_playing = true;
             switch (msg.type) {
                 case AUDIO_CMD_CLICK:
                     render_sound_click();
@@ -180,7 +188,49 @@ static void audio_task_worker(void *pvParameters) {
                 default:
                     break;
             }
+            s_is_playing = false;
         }
+    }
+}
+
+static void audio_record_task_worker(void *pvParameters) {
+    (void)pvParameters;
+    const size_t CHUNK_SAMPLES = 256;
+    int16_t rx_raw[CHUNK_SAMPLES * 2]; // 16-bit stereo chunk
+
+    Serial.printf("[AUDIO] FreeRTOS recording task started on Core %d\n", xPortGetCoreID());
+
+    while (1) {
+        // Block until triggered by audio_record_start()
+        ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+        Serial.println("[AUDIO] Recording task active: streaming I2S RX...");
+
+        s_record_bytes = 0;
+        while (s_is_recording) {
+            size_t bytes_read = 0;
+            esp_err_t res = i2s_read(BSP_I2S_NUM, rx_raw, sizeof(rx_raw), &bytes_read, pdMS_TO_TICKS(50));
+            if (res == ESP_OK && bytes_read > 0) {
+                size_t num_stereo_samples = bytes_read / (2 * sizeof(int16_t));
+                for (size_t i = 0; i < num_stereo_samples; i++) {
+                    if (s_record_bytes + sizeof(int16_t) > AUDIO_RECORD_BUFFER_BYTES) {
+                        Serial.println("[AUDIO] Recording buffer full!");
+                        s_is_recording = false;
+                        break;
+                    }
+                    // ES8311 ASDOUT sends ADC on Left or Right channel
+                    int16_t left = rx_raw[i * 2];
+                    int16_t right = rx_raw[i * 2 + 1];
+                    int16_t sample = (abs(left) >= abs(right)) ? left : right;
+
+                    if (s_record_buf) {
+                        int16_t *dest = (int16_t *)(s_record_buf + s_record_bytes);
+                        *dest = sample;
+                        s_record_bytes += sizeof(int16_t);
+                    }
+                }
+            }
+        }
+        Serial.printf("[AUDIO] Recording complete: %u bytes stored in PSRAM\n", (unsigned int)s_record_bytes);
     }
 }
 
@@ -240,6 +290,12 @@ static bool es8311_hardware_init(uint8_t init_vol_pct) {
     es8311_write_reg(0x0E, 0x02); // Enable analog PGA, enable ADC modulator
     es8311_write_reg(0x12, 0x00); // Power up DAC
     es8311_write_reg(0x13, 0x10); // Enable output to HP/Line drive
+
+    // 4.1. Configure ADC Microphone Preamp & Filter
+    es8311_write_reg(0x14, 0x1A); // Analog mic input, +30dB PGA gain
+    es8311_write_reg(0x15, 0x00); // ADC digital volume 0dB
+    es8311_write_reg(0x16, 0x00); // ADC ALC / normal
+    es8311_write_reg(0x17, 0xC0); // ADC HPF (High-pass filter) enabled to reject DC bias
     es8311_write_reg(0x1C, 0x6A); // ADC Equalizer bypass
     es8311_write_reg(0x37, 0x08); // Bypass DAC equalizer
 
@@ -272,9 +328,9 @@ bool audio_manager_init(void) {
         return false;
     }
 
-    // 4. Configure I2S Driver (Legacy standard ESP-IDF)
+    // 4. Configure I2S Driver (Legacy standard ESP-IDF duplex TX+RX)
     i2s_config_t i2s_config = {
-        .mode = (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_TX),
+        .mode = (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_TX | I2S_MODE_RX),
         .sample_rate = BSP_I2S_SAMPLE_RATE,
         .bits_per_sample = I2S_BITS_PER_SAMPLE_16BIT,
         .channel_format = I2S_CHANNEL_FMT_RIGHT_LEFT,
@@ -318,7 +374,18 @@ bool audio_manager_init(void) {
     digitalWrite(BSP_PA_PIN, HIGH);
     Serial.printf("[AUDIO] NS4150B Power Amplifier enabled on GPIO %d\n", BSP_PA_PIN);
 
-    // 7. Launch Audio Task pinned to Core 0
+    // 7. Allocate Microphone Recording Buffer in PSRAM
+    if (psramFound()) {
+        s_record_buf = (uint8_t *)heap_caps_malloc(AUDIO_RECORD_BUFFER_BYTES, MALLOC_CAP_SPIRAM);
+        if (s_record_buf) {
+            Serial.printf("[AUDIO] Allocated %u KB PSRAM buffer for microphone recording.\n",
+                          (unsigned int)(AUDIO_RECORD_BUFFER_BYTES / 1024));
+        } else {
+            Serial.println("[AUDIO] WARN: Failed to allocate recording buffer in PSRAM!");
+        }
+    }
+
+    // 8. Launch Audio Playback Task pinned to Core 0
     BaseType_t task_status = xTaskCreatePinnedToCore(
         audio_task_worker,
         BSP_AUDIO_TASK_NAME,
@@ -334,8 +401,23 @@ bool audio_manager_init(void) {
         return false;
     }
 
-    Serial.printf("[AUDIO] I2S initialized on MCLK=%d, BCLK=%d, LRC=%d, DOUT=%d, PA=%d (SampleRate: %d Hz)\n",
-                  BSP_I2S_MCLK_PIN, BSP_I2S_BCLK_PIN, BSP_I2S_LRC_PIN, BSP_I2S_DOUT_PIN, BSP_PA_PIN, BSP_I2S_SAMPLE_RATE);
+    // 9. Launch Audio Recording Task pinned to Core 0
+    BaseType_t rec_status = xTaskCreatePinnedToCore(
+        audio_record_task_worker,
+        "audio_rec_task",
+        3072,
+        NULL,
+        BSP_AUDIO_TASK_PRIORITY,
+        &s_record_task_handle,
+        BSP_AUDIO_TASK_CORE_ID
+    );
+
+    if (rec_status != pdPASS) {
+        Serial.println("[AUDIO] WARN: Failed to launch FreeRTOS recording task!");
+    }
+
+    Serial.printf("[AUDIO] I2S duplex initialized on MCLK=%d, BCLK=%d, LRC=%d, DOUT=%d, DIN=%d, PA=%d (SampleRate: %d Hz)\n",
+                  BSP_I2S_MCLK_PIN, BSP_I2S_BCLK_PIN, BSP_I2S_LRC_PIN, BSP_I2S_DOUT_PIN, BSP_I2S_DIN_PIN, BSP_PA_PIN, BSP_I2S_SAMPLE_RATE);
     return true;
 }
 
@@ -410,4 +492,43 @@ void audio_set_volume(uint8_t volume_pct) {
 
 uint8_t audio_get_volume(void) {
     return master_volume;
+}
+
+bool audio_record_start(void) {
+    if (!s_record_buf || s_is_recording) return false;
+    s_is_recording = true;
+    if (s_record_task_handle) {
+        xTaskNotifyGive(s_record_task_handle);
+    }
+    return true;
+}
+
+size_t audio_record_stop(void) {
+    if (!s_is_recording) return s_record_bytes;
+    s_is_recording = false;
+    vTaskDelay(pdMS_TO_TICKS(60));
+    return s_record_bytes;
+}
+
+const uint8_t *audio_record_get_buffer(void) {
+    return s_record_buf;
+}
+
+size_t audio_record_get_size(void) {
+    return s_record_bytes;
+}
+
+bool audio_is_recording(void) {
+    return s_is_recording;
+}
+
+bool audio_is_playing(void) {
+    return s_is_playing;
+}
+
+void audio_stop(void) {
+    if (audio_queue) {
+        xQueueReset(audio_queue);
+    }
+    s_is_playing = false;
 }

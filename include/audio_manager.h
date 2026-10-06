@@ -65,6 +65,43 @@ void audio_set_volume(uint8_t volume_pct);
  */
 uint8_t audio_get_volume(void);
 
+/**
+ * @brief Start recording audio from the ES8311 microphone ADC into PSRAM.
+ * @return true if recording successfully started, false otherwise.
+ */
+bool audio_record_start(void);
+
+/**
+ * @brief Stop recording audio from the ES8311 microphone ADC.
+ * @return Total number of bytes recorded in the PSRAM buffer.
+ */
+size_t audio_record_stop(void);
+
+/**
+ * @brief Get the pointer to the recorded 16kHz 16-bit Mono PCM buffer in PSRAM.
+ */
+const uint8_t *audio_record_get_buffer(void);
+
+/**
+ * @brief Get the number of valid bytes currently in the recording buffer.
+ */
+size_t audio_record_get_size(void);
+
+/**
+ * @brief Check if microphone audio recording is currently in progress.
+ */
+bool audio_is_recording(void);
+
+/**
+ * @brief Check if audio playback (speech/SFX) is currently in progress.
+ */
+bool audio_is_playing(void);
+
+/**
+ * @brief Stop any ongoing audio playback.
+ */
+void audio_stop(void);
+
 #ifdef __cplusplus
 }
 #endif

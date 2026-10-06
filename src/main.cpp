@@ -17,6 +17,7 @@
 #include "time_service.h"
 #include "results_sync.h"
 #include "audio_manager.h"
+#include "muse_manager.h"
 #include "ota_manager.h"
 #include "hal_battery.h"
 #include "hal_touch.h"
@@ -221,6 +222,11 @@ void setup() {
     #else
         Serial.println("[SYS] Wi-Fi/OTA disabled until a trusted update endpoint is provisioned.");
     #endif
+
+    // 4.1. Initialize Muse / Magic Assistant (עוזר קסם) Engine
+    if (!muse_manager_init()) {
+        Serial.println("[SYS] WARN: Muse assistant engine initialization failed.");
+    }
 
     #if BSP_DISPLAY_DIAGNOSTIC_MODE
         Serial.println("[SYS] DISPLAY DIAGNOSTIC MODE: game startup is intentionally paused.");

@@ -14,6 +14,7 @@
 #include "hal_battery.h"
 #include "hal_lvgl.h"
 #include "bsp_config.h"
+#include "muse_manager.h"
 #include <Arduino.h>
 
 #include <WiFi.h>
@@ -135,6 +136,13 @@ static void ui_live_status_timer_cb(lv_timer_t *timer) {
         lv_label_set_text(s_active_sys_wifi_info, wifi_buf);
     }
 
+    // 5. Update active Muse screen Wi-Fi icon
+    extern lv_obj_t *s_muse_wifi_lbl;
+    if (s_muse_wifi_lbl && lv_obj_is_valid(s_muse_wifi_lbl)) {
+        bool wifi_online = (WiFi.status() == WL_CONNECTED);
+        lv_obj_set_style_text_color(s_muse_wifi_lbl, lv_color_hex(wifi_online ? 0x10B981 : 0x64748B), LV_PART_MAIN);
+    }
+
     if (s_active_sys_time_info && lv_obj_is_valid(s_active_sys_time_info)) {
         char now_buf[40];
         char sync_buf[40];
@@ -186,6 +194,7 @@ static void on_profile_selected(lv_event_t *e) {
 static void on_back_to_profiles_clicked(lv_event_t *e) {
     if (lv_event_get_code(e) == LV_EVENT_CLICKED) {
         audio_play_click();
+        muse_manager_cancel();
         current_profile = PROFILE_NONE;
         player_data_set_active_profile(PROFILE_NONE);
         sm_load_screen(SCREEN_PROFILES);
@@ -711,6 +720,13 @@ static void on_system_card_clicked(lv_event_t *e) {
     }
 }
 
+static void on_muse_card_clicked(lv_event_t *e) {
+    if (lv_event_get_code(e) == LV_EVENT_CLICKED) {
+        audio_play_click();
+        sm_load_screen(SCREEN_MUSE);
+    }
+}
+
 void ui_screen_profiles_init(lv_obj_t *scr) {
     // 1. Screen Title: "מי הקוסם שמשחק עכשיו?"
     lv_obj_t *title_label = lv_label_create(scr);
@@ -736,7 +752,7 @@ void ui_screen_profiles_init(lv_obj_t *scr) {
     lv_obj_set_style_bg_opa(cont, LV_OPA_TRANSP, LV_PART_MAIN);
     lv_obj_set_style_border_width(cont, 0, LV_PART_MAIN);
     lv_obj_set_style_pad_all(cont, 0, LV_PART_MAIN);
-    lv_obj_set_style_pad_row(cont, 9, LV_PART_MAIN);
+    lv_obj_set_style_pad_row(cont, 6, LV_PART_MAIN);
     lv_obj_set_layout(cont, LV_LAYOUT_FLEX);
     lv_obj_set_flex_flow(cont, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(cont, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
@@ -747,8 +763,8 @@ void ui_screen_profiles_init(lv_obj_t *scr) {
         const ProfileInfo_t *p = &PROFILES_DATA[i];
 
         lv_obj_t *btn = lv_button_create(cont);
-        lv_obj_set_size(btn, 280, 72);
-        lv_obj_set_style_radius(btn, 16, LV_PART_MAIN);
+        lv_obj_set_size(btn, 280, 62);
+        lv_obj_set_style_radius(btn, 14, LV_PART_MAIN);
         lv_obj_set_style_bg_color(btn, lv_color_hex(COLOR_BG_CARD), LV_PART_MAIN);
         lv_obj_set_style_bg_opa(btn, LV_OPA_COVER, LV_PART_MAIN);
 
@@ -758,8 +774,8 @@ void ui_screen_profiles_init(lv_obj_t *scr) {
         lv_obj_set_style_border_opa(btn, (lv_opa_t)LV_OPA_80, LV_PART_MAIN);
 
         // 3D Shadow with profile glow
-        lv_obj_set_style_shadow_width(btn, 10, LV_PART_MAIN);
-        lv_obj_set_style_shadow_ofs_y(btn, 3, LV_PART_MAIN);
+        lv_obj_set_style_shadow_width(btn, 8, LV_PART_MAIN);
+        lv_obj_set_style_shadow_ofs_y(btn, 2, LV_PART_MAIN);
         lv_obj_set_style_shadow_color(btn, lv_color_hex(p->color_accent), LV_PART_MAIN);
         lv_obj_set_style_shadow_opa(btn, (lv_opa_t)LV_OPA_30, LV_PART_MAIN);
 
@@ -772,7 +788,7 @@ void ui_screen_profiles_init(lv_obj_t *scr) {
 
         // Avatar / Badge Icon
         lv_obj_t *badge_box = lv_obj_create(btn);
-        lv_obj_set_size(badge_box, 42, 42);
+        lv_obj_set_size(badge_box, 38, 38);
         lv_obj_set_style_radius(badge_box, 10, LV_PART_MAIN);
         lv_obj_set_style_bg_color(badge_box, lv_color_hex(p->color_accent), LV_PART_MAIN);
         lv_obj_set_style_bg_opa(badge_box, (lv_opa_t)LV_OPA_30, LV_PART_MAIN);
@@ -793,7 +809,7 @@ void ui_screen_profiles_init(lv_obj_t *scr) {
         lv_obj_set_style_text_font(name_lbl, &lv_font_hebrew_24, LV_PART_MAIN);
         lv_obj_set_style_text_color(name_lbl, lv_color_hex(0xFFFFFF), LV_PART_MAIN);
         lv_obj_set_style_base_dir(name_lbl, LV_BASE_DIR_RTL, LV_PART_MAIN);
-        lv_obj_align(name_lbl, LV_ALIGN_RIGHT_MID, -56, -10);
+        lv_obj_align(name_lbl, LV_ALIGN_RIGHT_MID, -52, -8);
 
         // Child Subtitle Label
         lv_obj_t *role_lbl = lv_label_create(btn);
@@ -801,20 +817,68 @@ void ui_screen_profiles_init(lv_obj_t *scr) {
         lv_obj_set_style_text_font(role_lbl, &lv_font_hebrew_16, LV_PART_MAIN);
         lv_obj_set_style_text_color(role_lbl, lv_color_hex(p->color_accent), LV_PART_MAIN);
         lv_obj_set_style_base_dir(role_lbl, LV_BASE_DIR_RTL, LV_PART_MAIN);
-        lv_obj_align(role_lbl, LV_ALIGN_RIGHT_MID, -56, 12);
+        lv_obj_align(role_lbl, LV_ALIGN_RIGHT_MID, -52, 11);
     }
 
-    // 5. 4th Card: System & OTA Settings ("הגדרות מערכת ומידע ⚙️")
+    // 5. 4th Card: Magic Assistant ("עוזר קסם")
+    lv_obj_t *muse_btn = lv_button_create(cont);
+    lv_obj_set_size(muse_btn, 280, 62);
+    lv_obj_set_style_radius(muse_btn, 14, LV_PART_MAIN);
+    lv_obj_set_style_bg_color(muse_btn, lv_color_hex(COLOR_BG_CARD), LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(muse_btn, LV_OPA_COVER, LV_PART_MAIN);
+    lv_obj_set_style_border_width(muse_btn, 2, LV_PART_MAIN);
+    lv_obj_set_style_border_color(muse_btn, lv_color_hex(0x8B5CF6), LV_PART_MAIN); // Vibrant Violet
+    lv_obj_set_style_border_opa(muse_btn, (lv_opa_t)LV_OPA_80, LV_PART_MAIN);
+    lv_obj_set_style_shadow_width(muse_btn, 8, LV_PART_MAIN);
+    lv_obj_set_style_shadow_ofs_y(muse_btn, 2, LV_PART_MAIN);
+    lv_obj_set_style_shadow_color(muse_btn, lv_color_hex(0x8B5CF6), LV_PART_MAIN);
+    lv_obj_set_style_shadow_opa(muse_btn, (lv_opa_t)LV_OPA_30, LV_PART_MAIN);
+    lv_obj_set_style_translate_y(muse_btn, 2, LV_STATE_PRESSED);
+    lv_obj_set_style_bg_color(muse_btn, lv_color_hex(0x0F172A), LV_STATE_PRESSED);
+    lv_obj_set_style_base_dir(muse_btn, LV_BASE_DIR_RTL, LV_PART_MAIN);
+    lv_obj_add_event_cb(muse_btn, on_muse_card_clicked, LV_EVENT_CLICKED, NULL);
+
+    lv_obj_t *muse_badge = lv_obj_create(muse_btn);
+    lv_obj_set_size(muse_badge, 38, 38);
+    lv_obj_set_style_radius(muse_badge, 10, LV_PART_MAIN);
+    lv_obj_set_style_bg_color(muse_badge, lv_color_hex(0x8B5CF6), LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(muse_badge, (lv_opa_t)LV_OPA_30, LV_PART_MAIN);
+    lv_obj_set_style_border_width(muse_badge, 1, LV_PART_MAIN);
+    lv_obj_set_style_border_color(muse_badge, lv_color_hex(0x8B5CF6), LV_PART_MAIN);
+    lv_obj_align(muse_badge, LV_ALIGN_RIGHT_MID, -6, 0);
+    lv_obj_remove_flag(muse_badge, (lv_obj_flag_t)(LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE));
+
+    lv_obj_t *muse_icon = lv_label_create(muse_badge);
+    lv_label_set_text(muse_icon, "M");
+    lv_obj_set_style_text_font(muse_icon, &lv_font_hebrew_24, LV_PART_MAIN);
+    lv_obj_set_style_text_color(muse_icon, lv_color_hex(0xFFFFFF), LV_PART_MAIN);
+    lv_obj_center(muse_icon);
+
+    lv_obj_t *muse_name = lv_label_create(muse_btn);
+    lv_label_set_text(muse_name, "עוזר קסם");
+    lv_obj_set_style_text_font(muse_name, &lv_font_hebrew_24, LV_PART_MAIN);
+    lv_obj_set_style_text_color(muse_name, lv_color_hex(0xFFFFFF), LV_PART_MAIN);
+    lv_obj_set_style_base_dir(muse_name, LV_BASE_DIR_RTL, LV_PART_MAIN);
+    lv_obj_align(muse_name, LV_ALIGN_RIGHT_MID, -52, -8);
+
+    lv_obj_t *muse_sub = lv_label_create(muse_btn);
+    lv_label_set_text(muse_sub, "שאל אותי כל שאלה");
+    lv_obj_set_style_text_font(muse_sub, &lv_font_hebrew_16, LV_PART_MAIN);
+    lv_obj_set_style_text_color(muse_sub, lv_color_hex(0x8B5CF6), LV_PART_MAIN);
+    lv_obj_set_style_base_dir(muse_sub, LV_BASE_DIR_RTL, LV_PART_MAIN);
+    lv_obj_align(muse_sub, LV_ALIGN_RIGHT_MID, -52, 11);
+
+    // 6. 5th Card: System & OTA Settings ("הגדרות מערכת ומידע ⚙️")
     lv_obj_t *sys_btn = lv_button_create(cont);
-    lv_obj_set_size(sys_btn, 280, 72);
-    lv_obj_set_style_radius(sys_btn, 16, LV_PART_MAIN);
+    lv_obj_set_size(sys_btn, 280, 62);
+    lv_obj_set_style_radius(sys_btn, 14, LV_PART_MAIN);
     lv_obj_set_style_bg_color(sys_btn, lv_color_hex(COLOR_BG_CARD), LV_PART_MAIN);
     lv_obj_set_style_bg_opa(sys_btn, LV_OPA_COVER, LV_PART_MAIN);
     lv_obj_set_style_border_width(sys_btn, 2, LV_PART_MAIN);
     lv_obj_set_style_border_color(sys_btn, lv_color_hex(0x38BDF8), LV_PART_MAIN); // Radiant Sky Blue
     lv_obj_set_style_border_opa(sys_btn, (lv_opa_t)LV_OPA_80, LV_PART_MAIN);
-    lv_obj_set_style_shadow_width(sys_btn, 10, LV_PART_MAIN);
-    lv_obj_set_style_shadow_ofs_y(sys_btn, 3, LV_PART_MAIN);
+    lv_obj_set_style_shadow_width(sys_btn, 8, LV_PART_MAIN);
+    lv_obj_set_style_shadow_ofs_y(sys_btn, 2, LV_PART_MAIN);
     lv_obj_set_style_shadow_color(sys_btn, lv_color_hex(0x38BDF8), LV_PART_MAIN);
     lv_obj_set_style_shadow_opa(sys_btn, (lv_opa_t)LV_OPA_30, LV_PART_MAIN);
     lv_obj_set_style_translate_y(sys_btn, 2, LV_STATE_PRESSED);
@@ -823,7 +887,7 @@ void ui_screen_profiles_init(lv_obj_t *scr) {
     lv_obj_add_event_cb(sys_btn, on_system_card_clicked, LV_EVENT_CLICKED, NULL);
 
     lv_obj_t *sys_badge = lv_obj_create(sys_btn);
-    lv_obj_set_size(sys_badge, 42, 42);
+    lv_obj_set_size(sys_badge, 38, 38);
     lv_obj_set_style_radius(sys_badge, 10, LV_PART_MAIN);
     lv_obj_set_style_bg_color(sys_badge, lv_color_hex(0x38BDF8), LV_PART_MAIN);
     lv_obj_set_style_bg_opa(sys_badge, (lv_opa_t)LV_OPA_30, LV_PART_MAIN);
@@ -833,8 +897,9 @@ void ui_screen_profiles_init(lv_obj_t *scr) {
     lv_obj_remove_flag(sys_badge, (lv_obj_flag_t)(LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE));
 
     lv_obj_t *sys_icon = lv_label_create(sys_badge);
-    lv_label_set_text(sys_icon, "⚙️");
-    lv_obj_set_style_text_font(sys_icon, &lv_font_hebrew_24, LV_PART_MAIN);
+    lv_label_set_text(sys_icon, LV_SYMBOL_SETTINGS);
+    lv_obj_set_style_text_font(sys_icon, &lv_font_montserrat_24, LV_PART_MAIN);
+    lv_obj_set_style_text_color(sys_icon, lv_color_hex(0xFFFFFF), LV_PART_MAIN);
     lv_obj_center(sys_icon);
 
     lv_obj_t *sys_name = lv_label_create(sys_btn);
@@ -842,14 +907,14 @@ void ui_screen_profiles_init(lv_obj_t *scr) {
     lv_obj_set_style_text_font(sys_name, &lv_font_hebrew_24, LV_PART_MAIN);
     lv_obj_set_style_text_color(sys_name, lv_color_hex(0xFFFFFF), LV_PART_MAIN);
     lv_obj_set_style_base_dir(sys_name, LV_BASE_DIR_RTL, LV_PART_MAIN);
-    lv_obj_align(sys_name, LV_ALIGN_RIGHT_MID, -56, -10);
+    lv_obj_align(sys_name, LV_ALIGN_RIGHT_MID, -52, -8);
 
     lv_obj_t *sys_sub = lv_label_create(sys_btn);
     lv_label_set_text(sys_sub, "גרסה, Wi-Fi ועדכוני OTA");
     lv_obj_set_style_text_font(sys_sub, &lv_font_hebrew_16, LV_PART_MAIN);
     lv_obj_set_style_text_color(sys_sub, lv_color_hex(0x38BDF8), LV_PART_MAIN);
     lv_obj_set_style_base_dir(sys_sub, LV_BASE_DIR_RTL, LV_PART_MAIN);
-    lv_obj_align(sys_sub, LV_ALIGN_RIGHT_MID, -56, 12);
+    lv_obj_align(sys_sub, LV_ALIGN_RIGHT_MID, -52, 11);
 }
 
 /* ========================================================================== */
@@ -1340,8 +1405,9 @@ void ui_screen_dashboard_init(lv_obj_t *scr) {
 
     // Emoji
     lv_obj_t *sys_emoji = lv_label_create(sys_card);
-    lv_label_set_text(sys_emoji, "⚙️");
-    lv_obj_set_style_text_font(sys_emoji, &lv_font_hebrew_24, LV_PART_MAIN);
+    lv_label_set_text(sys_emoji, LV_SYMBOL_SETTINGS);
+    lv_obj_set_style_text_font(sys_emoji, &lv_font_montserrat_24, LV_PART_MAIN);
+    lv_obj_set_style_text_color(sys_emoji, lv_color_hex(0x38BDF8), LV_PART_MAIN);
     lv_obj_align(sys_emoji, LV_ALIGN_TOP_LEFT, 0, 0);
 
     // Title
@@ -1375,7 +1441,7 @@ void ui_screen_dashboard_init(lv_obj_t *scr) {
     lv_obj_add_event_cb(sys_btn, on_system_card_clicked, LV_EVENT_CLICKED, NULL);
 
     lv_obj_t *sys_btn_lbl = lv_label_create(sys_btn);
-    lv_label_set_text(sys_btn_lbl, "הגדרות ו-OTA 🚀");
+    lv_label_set_text(sys_btn_lbl, LV_SYMBOL_SETTINGS " הגדרות ו-OTA");
     lv_obj_set_style_text_font(sys_btn_lbl, &lv_font_hebrew_16, LV_PART_MAIN);
     lv_obj_center(sys_btn_lbl);
 }
@@ -1411,6 +1477,197 @@ void ui_screen_splash_init(lv_obj_t *scr) {
 }
 
 /* ========================================================================== */
+/*                         SCREEN BUILDER: MAGIC ASSISTANT (MUSE)             */
+/* ========================================================================== */
+
+static lv_obj_t *s_muse_chat_lbl = NULL;
+static lv_obj_t *s_muse_status_lbl = NULL;
+static lv_obj_t *s_muse_ptt_btn = NULL;
+static lv_obj_t *s_muse_ptt_lbl = NULL;
+static lv_obj_t *s_muse_orb = NULL;
+lv_obj_t *s_muse_wifi_lbl = NULL;
+
+void ui_screen_muse_update_response(const char *query, const char *resp) {
+    if (s_muse_chat_lbl && lv_obj_is_valid(s_muse_chat_lbl)) {
+        static char chat_buf[768];
+        snprintf(chat_buf, sizeof(chat_buf),
+                 "שאלת:\n\"%s\"\n\nתשובת עוזר הקסם:\n%s",
+                 query ? query : "",
+                 resp ? resp : "");
+        lv_label_set_text(s_muse_chat_lbl, chat_buf);
+        lv_obj_scroll_to_view(s_muse_chat_lbl, LV_ANIM_ON);
+    }
+}
+
+void ui_screen_muse_update_status(const char *status, uint32_t color_hex) {
+    if (s_muse_status_lbl && lv_obj_is_valid(s_muse_status_lbl)) {
+        lv_label_set_text(s_muse_status_lbl, status);
+        lv_obj_set_style_text_color(s_muse_status_lbl, lv_color_hex(color_hex), LV_PART_MAIN);
+    }
+    if (s_muse_orb && lv_obj_is_valid(s_muse_orb)) {
+        lv_obj_set_style_bg_color(s_muse_orb, lv_color_hex(color_hex), LV_PART_MAIN);
+    }
+}
+
+static void on_muse_ptt_event(lv_event_t *e) {
+    lv_event_code_t code = lv_event_get_code(e);
+
+    if (code == LV_EVENT_PRESSED) {
+        if (s_muse_ptt_lbl && lv_obj_is_valid(s_muse_ptt_lbl)) {
+            lv_label_set_text(s_muse_ptt_lbl, LV_SYMBOL_AUDIO " מקליט... (שחרר לסיום)");
+        }
+        if (s_muse_ptt_btn && lv_obj_is_valid(s_muse_ptt_btn)) {
+            lv_obj_set_style_bg_color(s_muse_ptt_btn, lv_color_hex(0xDC2626), LV_PART_MAIN);
+        }
+        muse_manager_on_ptt_down();
+    } else if (code == LV_EVENT_RELEASED) {
+        if (s_muse_ptt_lbl && lv_obj_is_valid(s_muse_ptt_lbl)) {
+            lv_label_set_text(s_muse_ptt_lbl, LV_SYMBOL_AUDIO " החזק כדי לדבר");
+        }
+        if (s_muse_ptt_btn && lv_obj_is_valid(s_muse_ptt_btn)) {
+            lv_obj_set_style_bg_color(s_muse_ptt_btn, lv_color_hex(0x8B5CF6), LV_PART_MAIN);
+        }
+        muse_manager_on_ptt_up();
+    }
+}
+
+void ui_screen_muse_init(lv_obj_t *scr) {
+    /* 1. Fixed Top HUD Bar (Always visible, cannot be hidden or scrolled) */
+    lv_obj_t *hud = lv_obj_create(scr);
+    lv_obj_set_size(hud, BSP_LCD_H_RES, 50);
+    lv_obj_align(hud, LV_ALIGN_TOP_MID, 0, 0);
+    lv_obj_set_style_bg_color(hud, lv_color_hex(0x000000), LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(hud, (lv_opa_t)LV_OPA_70, LV_PART_MAIN);
+    lv_obj_set_style_border_width(hud, 0, LV_PART_MAIN);
+    lv_obj_set_style_radius(hud, 0, LV_PART_MAIN);
+    lv_obj_set_layout(hud, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(hud, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(hud, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_remove_flag(hud, LV_OBJ_FLAG_SCROLLABLE);
+
+    // Title on Right
+    lv_obj_t *title_lbl = lv_label_create(hud);
+    lv_label_set_text(title_lbl, "עוזר קסם");
+    lv_obj_set_style_text_font(title_lbl, &lv_font_hebrew_24, LV_PART_MAIN);
+    lv_obj_set_style_text_color(title_lbl, lv_color_hex(0x8B5CF6), LV_PART_MAIN);
+    lv_obj_set_style_base_dir(title_lbl, LV_BASE_DIR_RTL, LV_PART_MAIN);
+
+    // Back to Profiles Button on Left - PINNED & ALWAYS ACCESSIBLE
+    lv_obj_t *back_btn = lv_button_create(hud);
+    lv_obj_set_size(back_btn, 80, 36);
+    lv_obj_set_style_bg_color(back_btn, lv_color_hex(0x334155), LV_PART_MAIN);
+    lv_obj_set_style_radius(back_btn, 8, LV_PART_MAIN);
+    lv_obj_add_event_cb(back_btn, on_back_to_profiles_clicked, LV_EVENT_CLICKED, NULL);
+
+    lv_obj_t *back_lbl = lv_label_create(back_btn);
+    lv_label_set_text(back_lbl, LV_SYMBOL_LEFT " חזור");
+    lv_obj_set_style_text_font(back_lbl, &lv_font_hebrew_24, LV_PART_MAIN);
+    lv_obj_set_style_text_color(back_lbl, lv_color_hex(0xFFFFFF), LV_PART_MAIN);
+    lv_obj_center(back_lbl);
+
+    // Live Wi-Fi indicator in HUD
+    lv_obj_t *wifi_lbl = lv_label_create(hud);
+    lv_label_set_text(wifi_lbl, LV_SYMBOL_WIFI);
+    lv_obj_set_style_text_font(wifi_lbl, &lv_font_montserrat_16, LV_PART_MAIN);
+    bool wifi_online = (WiFi.status() == WL_CONNECTED);
+    lv_obj_set_style_text_color(wifi_lbl, lv_color_hex(wifi_online ? 0x10B981 : 0x64748B), LV_PART_MAIN);
+    s_muse_wifi_lbl = wifi_lbl;
+
+    /* 2. Status & Avatar Header Bar (Y=54, H=46, W=296) */
+    lv_obj_t *status_box = lv_obj_create(scr);
+    lv_obj_set_size(status_box, 296, 46);
+    lv_obj_align(status_box, LV_ALIGN_TOP_MID, 0, 54);
+    lv_obj_set_style_bg_color(status_box, lv_color_hex(0x1E293B), LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(status_box, LV_OPA_COVER, LV_PART_MAIN);
+    lv_obj_set_style_border_width(status_box, 1, LV_PART_MAIN);
+    lv_obj_set_style_border_color(status_box, lv_color_hex(0x8B5CF6), LV_PART_MAIN);
+    lv_obj_set_style_radius(status_box, 12, LV_PART_MAIN);
+    lv_obj_set_style_pad_all(status_box, 4, LV_PART_MAIN);
+    lv_obj_remove_flag(status_box, LV_OBJ_FLAG_SCROLLABLE);
+
+    // Glowing Magic Orb
+    s_muse_orb = lv_obj_create(status_box);
+    lv_obj_set_size(s_muse_orb, 32, 32);
+    lv_obj_set_style_radius(s_muse_orb, LV_RADIUS_CIRCLE, LV_PART_MAIN);
+    lv_obj_set_style_bg_color(s_muse_orb, lv_color_hex(0x8B5CF6), LV_PART_MAIN);
+    lv_obj_set_style_border_width(s_muse_orb, 2, LV_PART_MAIN);
+    lv_obj_set_style_border_color(s_muse_orb, lv_color_hex(0xC084FC), LV_PART_MAIN);
+    lv_obj_set_style_shadow_width(s_muse_orb, 10, LV_PART_MAIN);
+    lv_obj_set_style_shadow_color(s_muse_orb, lv_color_hex(0x8B5CF6), LV_PART_MAIN);
+    lv_obj_set_style_shadow_opa(s_muse_orb, (lv_opa_t)LV_OPA_60, LV_PART_MAIN);
+    lv_obj_align(s_muse_orb, LV_ALIGN_RIGHT_MID, -4, 0);
+
+    lv_obj_t *orb_icon = lv_label_create(s_muse_orb);
+    lv_label_set_text(orb_icon, "M");
+    lv_obj_set_style_text_font(orb_icon, &lv_font_hebrew_16, LV_PART_MAIN);
+    lv_obj_set_style_text_color(orb_icon, lv_color_hex(0xFFFFFF), LV_PART_MAIN);
+    lv_obj_center(orb_icon);
+
+    // Status Text
+    s_muse_status_lbl = lv_label_create(status_box);
+    lv_label_set_text(s_muse_status_lbl, "מוכן לשאלה! לחץ והחזק");
+    lv_obj_set_style_text_font(s_muse_status_lbl, &lv_font_hebrew_16, LV_PART_MAIN);
+    lv_obj_set_style_text_color(s_muse_status_lbl, lv_color_hex(0x38BDF8), LV_PART_MAIN);
+    lv_obj_set_style_base_dir(s_muse_status_lbl, LV_BASE_DIR_RTL, LV_PART_MAIN);
+    lv_obj_align(s_muse_status_lbl, LV_ALIGN_RIGHT_MID, -44, 0);
+
+    /* 3. Text Output & Conversation Area (Y=106, H=295, W=296) */
+    lv_obj_t *chat_card = lv_obj_create(scr);
+    lv_obj_set_size(chat_card, 296, 295);
+    lv_obj_align(chat_card, LV_ALIGN_TOP_MID, 0, 106);
+    lv_obj_set_style_bg_color(chat_card, lv_color_hex(COLOR_BG_CARD), LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(chat_card, LV_OPA_COVER, LV_PART_MAIN);
+    lv_obj_set_style_border_width(chat_card, 2, LV_PART_MAIN);
+    lv_obj_set_style_border_color(chat_card, lv_color_hex(0x475569), LV_PART_MAIN);
+    lv_obj_set_style_radius(chat_card, 14, LV_PART_MAIN);
+    lv_obj_set_style_pad_all(chat_card, 10, LV_PART_MAIN);
+    lv_obj_add_flag(chat_card, LV_OBJ_FLAG_SCROLLABLE);
+
+    s_muse_chat_lbl = lv_label_create(chat_card);
+    lv_label_set_text(s_muse_chat_lbl,
+        "שלום! אני עוזר הקסם שלך.\n\n"
+        "לחץ והחזק את כפתור הדיבור למטה,\n"
+        "ואענה לך בקול וגם בטקסט כאן על המסך!\n\n"
+        "דוגמאות לשאלות שתוכל לשאול:\n"
+        "- מהו הכוכב הכי גדול במערכת השמש?\n"
+        "- למה השמיים כחולים ביום?\n"
+        "- כמה זה 12 כפול 12?\n"
+        "- מהי המהירות של האור?\n"
+        "- מי המציא את החשמל?");
+    lv_obj_set_style_text_font(s_muse_chat_lbl, &lv_font_hebrew_16, LV_PART_MAIN);
+    lv_obj_set_style_text_color(s_muse_chat_lbl, lv_color_hex(0xF1F5F9), LV_PART_MAIN);
+    lv_obj_set_style_base_dir(s_muse_chat_lbl, LV_BASE_DIR_RTL, LV_PART_MAIN);
+    lv_obj_set_style_text_align(s_muse_chat_lbl, LV_TEXT_ALIGN_RIGHT, LV_PART_MAIN);
+    lv_label_set_long_mode(s_muse_chat_lbl, LV_LABEL_LONG_WRAP);
+    lv_obj_set_width(s_muse_chat_lbl, 272);
+    lv_obj_align(s_muse_chat_lbl, LV_ALIGN_TOP_RIGHT, 0, 0);
+
+    /* 4. Bottom Push-To-Talk Button (Y=410, H=58, W=280) */
+    s_muse_ptt_btn = lv_button_create(scr);
+    lv_obj_set_size(s_muse_ptt_btn, 280, 58);
+    lv_obj_align(s_muse_ptt_btn, LV_ALIGN_BOTTOM_MID, 0, -8);
+    lv_obj_set_style_radius(s_muse_ptt_btn, 29, LV_PART_MAIN);
+    lv_obj_set_style_bg_color(s_muse_ptt_btn, lv_color_hex(0x8B5CF6), LV_PART_MAIN);
+    lv_obj_set_style_border_width(s_muse_ptt_btn, 2, LV_PART_MAIN);
+    lv_obj_set_style_border_color(s_muse_ptt_btn, lv_color_hex(0xC084FC), LV_PART_MAIN);
+    lv_obj_set_style_shadow_width(s_muse_ptt_btn, 14, LV_PART_MAIN);
+    lv_obj_set_style_shadow_ofs_y(s_muse_ptt_btn, 3, LV_PART_MAIN);
+    lv_obj_set_style_shadow_color(s_muse_ptt_btn, lv_color_hex(0x8B5CF6), LV_PART_MAIN);
+    lv_obj_set_style_shadow_opa(s_muse_ptt_btn, (lv_opa_t)LV_OPA_40, LV_PART_MAIN);
+    lv_obj_set_style_translate_y(s_muse_ptt_btn, 2, LV_STATE_PRESSED);
+
+    lv_obj_add_event_cb(s_muse_ptt_btn, on_muse_ptt_event, LV_EVENT_PRESSED, NULL);
+    lv_obj_add_event_cb(s_muse_ptt_btn, on_muse_ptt_event, LV_EVENT_RELEASED, NULL);
+
+    s_muse_ptt_lbl = lv_label_create(s_muse_ptt_btn);
+    lv_label_set_text(s_muse_ptt_lbl, LV_SYMBOL_AUDIO " החזק כדי לדבר");
+    lv_obj_set_style_text_font(s_muse_ptt_lbl, &lv_font_hebrew_24, LV_PART_MAIN);
+    lv_obj_set_style_text_color(s_muse_ptt_lbl, lv_color_hex(0xFFFFFF), LV_PART_MAIN);
+    lv_obj_set_style_base_dir(s_muse_ptt_lbl, LV_BASE_DIR_RTL, LV_PART_MAIN);
+    lv_obj_center(s_muse_ptt_lbl);
+}
+
+/* ========================================================================== */
 /*                         DYNAMIC SCREEN LIFECYCLE                           */
 /* ========================================================================== */
 
@@ -1437,6 +1694,12 @@ void sm_load_screen(ScreenID_t screen_id) {
     s_active_sys_time_info = NULL;
     s_active_sys_vol_lbl = NULL;
     s_active_sys_vol_slider = NULL;
+    s_muse_chat_lbl = NULL;
+    s_muse_status_lbl = NULL;
+    s_muse_ptt_btn = NULL;
+    s_muse_ptt_lbl = NULL;
+    s_muse_orb = NULL;
+    s_muse_wifi_lbl = NULL;
 
     // 1. Create fresh screen object in PSRAM
     lv_obj_t *new_scr = lv_obj_create(NULL);
@@ -1465,6 +1728,9 @@ void sm_load_screen(ScreenID_t screen_id) {
             break;
         case SCREEN_SYSTEM:
             ui_screen_system_init(new_scr);
+            break;
+        case SCREEN_MUSE:
+            ui_screen_muse_init(new_scr);
             break;
         default:
             Serial.printf("[SM] WARN: Unknown screen ID %d, loading profiles.\n", (int)screen_id);
