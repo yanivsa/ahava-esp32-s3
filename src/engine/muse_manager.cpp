@@ -109,6 +109,51 @@ static void set_state(MuseState_t new_state) {
     s_state = new_state;
 }
 
+struct HttpRespBuf {
+    char data[2048];
+    size_t len;
+};
+
+static esp_err_t muse_http_event_handler(esp_http_client_event_t *evt) {
+    HttpRespBuf *buf = (HttpRespBuf *)evt->user_data;
+    if (!buf) return ESP_OK;
+    if (evt->event_id == HTTP_EVENT_ON_DATA) {
+        if (buf->len + evt->data_len < sizeof(buf->data) - 1) {
+            memcpy(buf->data + buf->len, evt->data, evt->data_len);
+            buf->len += evt->data_len;
+            buf->data[buf->len] = '\0';
+        }
+    }
+    return ESP_OK;
+}
+
+static bool parse_json_string_field(const char *json_str, const char *key, char *out_val, size_t max_len) {
+    if (!json_str || !key || !out_val || max_len == 0) return false;
+    out_val[0] = '\0';
+
+    char search_pattern[64];
+    snprintf(search_pattern, sizeof(search_pattern), "\"%s\":\"", key);
+    const char *start = strstr(json_str, search_pattern);
+    if (!start) return false;
+    start += strlen(search_pattern);
+
+    size_t i = 0;
+    while (*start && *start != '"' && i < max_len - 1) {
+        if (*start == '\\' && *(start + 1) != '\0') {
+            start++;
+            if (*start == 'n') out_val[i++] = '\n';
+            else if (*start == '"') out_val[i++] = '"';
+            else if (*start == '\\') out_val[i++] = '\\';
+            else out_val[i++] = *start;
+        } else {
+            out_val[i++] = *start;
+        }
+        start++;
+    }
+    out_val[i] = '\0';
+    return (i > 0);
+}
+
 static void muse_process_query_async(void *pvParameters) {
     (void)pvParameters;
     Serial.printf("[MUSE] Async worker started on Core %d\n", xPortGetCoreID());
@@ -118,44 +163,76 @@ static void muse_process_query_async(void *pvParameters) {
         ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
         s_cancel_requested = false;
 
-        Serial.println("[MUSE] Processing speech input...");
+        size_t recorded_audio_bytes = audio_record_get_size();
+        Serial.printf("[MUSE] Processing speech input (%u bytes recorded)...\n", (unsigned int)recorded_audio_bytes);
 
-        // 1. Update UI Status to Thinking / Processing
+        // 1. Check Wi-Fi connection
+        if (WiFi.status() != WL_CONNECTED) {
+            Serial.println("[MUSE] Wi-Fi not connected!");
+            if (hal_lvgl_lock(portMAX_DELAY)) {
+                ui_screen_muse_update_status("אין חיבור Wi-Fi לעוזר הקסם", 0xEF4444);
+                hal_lvgl_unlock();
+            }
+            vTaskDelay(pdMS_TO_TICKS(3000));
+            set_state(MUSE_STATE_IDLE);
+            if (hal_lvgl_lock(portMAX_DELAY)) {
+                ui_screen_muse_update_status("מוכן לשאלה! לחץ והחזק", 0x38BDF8);
+                hal_lvgl_unlock();
+            }
+            continue;
+        }
+
+        // 2. Update UI Status to Thinking / Processing
         if (hal_lvgl_lock(portMAX_DELAY)) {
             ui_screen_muse_update_status("חושב על תשובה...", 0xF59E0B);
             hal_lvgl_unlock();
         }
 
-        // 2. Select Question and Answer
-        const char *query_text = nullptr;
-        const char *answer_text = nullptr;
-
+        // 3. Query Cloud Endpoint
+        char parsed_query[128] = "";
+        char parsed_answer[512] = "";
         bool online_success = false;
-        if (!s_cancel_requested && WiFi.status() == WL_CONNECTED && strlen(AHAVA_MUSE_API_TOKEN) > 0) {
+
+        if (!s_cancel_requested) {
             Serial.printf("[MUSE] Sending query to endpoint: %s\n", AHAVA_MUSE_API_URL);
+
+            HttpRespBuf resp_buf = {};
             esp_http_client_config_t config = {};
             config.url = AHAVA_MUSE_API_URL;
             config.crt_bundle_attach = esp_crt_bundle_attach;
-            config.timeout_ms = 6000;
+            config.timeout_ms = 12000;
             config.keep_alive_enable = false;
+            config.event_handler = muse_http_event_handler;
+            config.user_data = &resp_buf;
 
             esp_http_client_handle_t client = esp_http_client_init(&config);
             if (client) {
                 esp_http_client_set_method(client, HTTP_METHOD_POST);
                 esp_http_client_set_header(client, "Content-Type", "application/json");
-                const String auth = String("Bearer ") + AHAVA_MUSE_API_TOKEN;
-                esp_http_client_set_header(client, "Authorization", auth.c_str());
 
-                const char *post_data = "{\"action\":\"ask\"}";
-                esp_http_client_set_post_field(client, post_data, strlen(post_data));
+                if (strlen(AHAVA_MUSE_API_TOKEN) > 0) {
+                    const String auth = String("Bearer ") + AHAVA_MUSE_API_TOKEN;
+                    esp_http_client_set_header(client, "Authorization", auth.c_str());
+                }
+
+                char post_payload[128];
+                snprintf(post_payload, sizeof(post_payload), "{\"action\":\"ask\",\"audio_bytes\":%u}", (unsigned int)recorded_audio_bytes);
+                esp_http_client_set_post_field(client, post_payload, strlen(post_payload));
 
                 esp_err_t err = esp_http_client_perform(client);
                 if (err == ESP_OK) {
                     int status_code = esp_http_client_get_status_code(client);
                     if (status_code >= 200 && status_code < 300) {
-                        Serial.printf("[MUSE] Server response HTTP %d\n", status_code);
-                        online_success = true;
+                        Serial.printf("[MUSE] Server response HTTP %d: %s\n", status_code, resp_buf.data);
+                        if (parse_json_string_field(resp_buf.data, "answer", parsed_answer, sizeof(parsed_answer))) {
+                            parse_json_string_field(resp_buf.data, "query", parsed_query, sizeof(parsed_query));
+                            online_success = true;
+                        }
+                    } else {
+                        Serial.printf("[MUSE] Server returned HTTP %d\n", status_code);
                     }
+                } else {
+                    Serial.printf("[MUSE] HTTP perform failed: 0x%x\n", err);
                 }
                 esp_http_client_cleanup(client);
             }
@@ -166,20 +243,23 @@ static void muse_process_query_async(void *pvParameters) {
             continue;
         }
 
-        // 3. Fallback to on-device knowledge base if offline or direct
-        if (!online_success) {
+        // 4. Update local query and response buffers
+        if (online_success && strlen(parsed_answer) > 0) {
+            if (strlen(parsed_query) > 0) {
+                strncpy(s_last_query, parsed_query, sizeof(s_last_query) - 1);
+                s_last_query[sizeof(s_last_query) - 1] = '\0';
+            }
+            strncpy(s_last_response, parsed_answer, sizeof(s_last_response) - 1);
+            s_last_response[sizeof(s_last_response) - 1] = '\0';
+        } else {
             uint32_t idx = s_query_index % KNOWLEDGE_BASE_SIZE;
             s_query_index++;
-            query_text = MUSE_KNOWLEDGE_BASE[idx].query;
-            answer_text = MUSE_KNOWLEDGE_BASE[idx].answer;
+            strncpy(s_last_query, MUSE_KNOWLEDGE_BASE[idx].query, sizeof(s_last_query) - 1);
+            s_last_query[sizeof(s_last_query) - 1] = '\0';
+            strncpy(s_last_response, MUSE_KNOWLEDGE_BASE[idx].answer, sizeof(s_last_response) - 1);
+            s_last_response[sizeof(s_last_response) - 1] = '\0';
         }
 
-        // Store into safe buffers
-        strncpy(s_last_query, query_text, sizeof(s_last_query) - 1);
-        s_last_query[sizeof(s_last_query) - 1] = '\0';
-
-        strncpy(s_last_response, answer_text, sizeof(s_last_response) - 1);
-        s_last_response[sizeof(s_last_response) - 1] = '\0';
         s_has_new_response = true;
 
         if (s_cancel_requested) {
@@ -187,23 +267,18 @@ static void muse_process_query_async(void *pvParameters) {
             continue;
         }
 
-        // 4. Update UI with text display on screen (Core 1 thread safety)
+        // 5. Update UI with text display on screen (Core 1 thread safety)
         set_state(MUSE_STATE_SPEAKING);
         if (hal_lvgl_lock(portMAX_DELAY)) {
             ui_screen_muse_update_response(s_last_query, s_last_response);
-            ui_screen_muse_update_status("משמיע תשובה...", 0x10B981);
+            ui_screen_muse_update_status("הנה התשובה!", 0x10B981);
             hal_lvgl_unlock();
         }
 
-        // 5. Play voice / audio feedback
-        audio_play_voice_success();
+        // 6. Play soft magic sound (NOT the quiz praise "כל הכבוד!")
+        audio_play_click();
 
-        // 6. Wait for audio playback or yield
-        for (int i = 0; i < 20; i++) {
-            vTaskDelay(pdMS_TO_TICKS(100));
-            if (s_cancel_requested) break;
-            if (!audio_is_playing()) break;
-        }
+        vTaskDelay(pdMS_TO_TICKS(1500));
 
         if (!s_cancel_requested) {
             set_state(MUSE_STATE_IDLE);

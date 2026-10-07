@@ -6,6 +6,8 @@
 
 #if __has_include("muse_secret.h")
 #include "muse_secret.h"
-#else
-#define AHAVA_MUSE_API_TOKEN ""
+#endif
+
+#ifndef AHAVA_MUSE_API_TOKEN
+#define AHAVA_MUSE_API_TOKEN "mgst_LwrwZJR8VpHcLxieLh0dOa8EOxR3TjxxgKg2Hk6UpCs"
 #endif

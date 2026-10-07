@@ -141,6 +141,133 @@ async function handleBatch(request, env) {
   });
 }
 
+const MUSE_PROMPTS = [
+  {
+    keywords: ["שמש", "כוכב", "חלל", "צדק", "ירח", "מאדים", "גלקסיה"],
+    query: "מהו הכוכב הכי גדול במערכת השמש?",
+    answer: "צדק הוא כוכב הלכת הגדול ביותר במערכת השמש! הוא כל כך ענק, שכל שאר כוכבי הלכת יכולים להיכנס בתוכו יחד."
+  },
+  {
+    keywords: ["שמיים", "כחול", "אור", "כחולים"],
+    query: "למה השמיים כחולים ביום?",
+    answer: "האטמוספירה של כדור הארץ מפזרת את קרני האור הכחולות של השמש לכל הכיוונים הרבה יותר משאר הצבעים."
+  },
+  {
+    keywords: ["כפל", "כפול", "חשבון", "מספר", "מתמטיקה", "12", "לוח הכפל"],
+    query: "כמה זה 12 כפול 12?",
+    answer: "12 כפול 12 שווה 144! זוהי אחת הכפולות השימושיות והחשובות ביותר בלוח הכפל."
+  },
+  {
+    keywords: ["מהירות", "אור", "כמה מהר"],
+    query: "מהי מהירות האור?",
+    answer: "מהירות האור היא כ-300,000 קילומטרים בשנייה! אור מהשמש מגיע אל כדור הארץ בתוך 8 דקות ו-20 שניות."
+  },
+  {
+    keywords: ["מטוס", "עף", "אוויר", "לטוס", "כנף"],
+    query: "איך מטוס עף באוויר?",
+    answer: "מבנה הכנפיים יוצר כוח עילוי: האוויר שמעל הכנף זורם מהר יותר מהאוויר שמתחתיה ודוחף את המטוס למעלה."
+  },
+  {
+    keywords: ["לווייתן", "חיה", "יונק", "גדול", "בעל חיים"],
+    query: "מי היונק הכי גדול בעולם?",
+    answer: "הלווייתן הכחול הוא בעל החיים הגדול ביותר שחי אי פעם! אורכו מגיע ל-30 מטרים ומשקלו לכ-180 טון."
+  },
+  {
+    keywords: ["דבור", "דבורה", "דבש", "כוורת"],
+    query: "איך דבורים מייצרות דבש?",
+    answer: "הדבורים אוספות צוף מתוק מפרחים ומנפנפות בכנפיהן בכוורת כדי לאדות את המים עד שנוצר דבש טהור ומתוק."
+  },
+  {
+    keywords: ["קשת", "ענן", "גשם", "צבעי הקשת"],
+    query: "איך נוצרת קשת בענן?",
+    answer: "טיפות הגשם שוברות את קרני השמש כמו מנסרה ומפרידות את האור הלבן לכל שבעת צבעי הקשת המרהיבים!"
+  },
+  {
+    keywords: ["ראשוני", "מספר ראשוני"],
+    query: "מהו מספר ראשוני?",
+    answer: "מספר ראשוני מתחלק ללא שארית רק בעצמו וב-1, כמו 2, 3, 5, 7 ו-11. המספר 2 הוא הראשוני הזוגי היחיד!"
+  },
+  {
+    keywords: ["קסם", "קוסם", "הצלחה", "סוד", "חכם"],
+    query: "מה הסוד של קוסם וחכם אמיתי?",
+    answer: "הסוד האמיתי הוא התמדה, אהבת הלימוד וסקרנות בלתי פוסקת! מי ששואל שאלות ומנסה שוב ושוב - מצליח בכל דרכיו!"
+  }
+];
+
+async function handleMuseQuery(request, env) {
+  let queryText = "";
+  let audioBytesCount = 0;
+
+  try {
+    const contentType = request.headers.get("Content-Type") || "";
+    if (contentType.includes("application/json")) {
+      const body = await request.json();
+      queryText = String(body.query || body.question || "").trim();
+      audioBytesCount = Number(body.audio_bytes || 0);
+    } else {
+      const text = await request.text();
+      if (text) queryText = text.trim();
+    }
+  } catch {
+    // ignore parse error
+  }
+
+  // If Gemini API Key is configured on environment, query Google Gemini
+  if (env.GEMINI_API_KEY && queryText) {
+    try {
+      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${env.GEMINI_API_KEY}`;
+      const prompt = "אתה 'עוזר קסם' של אקדמיית הקוסמים לילדים. ענה לילד בעברית פשוטה, ברורה ומעניינת ב-1 עד 2 משפטים קצרים בלבד (עד 35 מילים). אל תשתמש באימוג'ים או תווים באנגלית. שאלה: " + queryText;
+      const resp = await fetch(geminiUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }]
+        })
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        const candidate = data.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (candidate) {
+          return json({
+            ok: true,
+            source: "muse_gemini_ai",
+            query: queryText,
+            answer: candidate.trim(),
+            serverTime: new Date().toISOString()
+          });
+        }
+      }
+    } catch {
+      // Fallback to knowledge base
+    }
+  }
+
+  // Educational contextual matcher
+  let match = null;
+  if (queryText) {
+    const lower = queryText.toLowerCase();
+    for (const item of MUSE_PROMPTS) {
+      if (item.keywords.some((k) => lower.includes(k))) {
+        match = item;
+        break;
+      }
+    }
+  }
+
+  if (!match) {
+    const idx = Math.floor(Date.now() / 15000) % MUSE_PROMPTS.length;
+    match = MUSE_PROMPTS[idx];
+  }
+
+  return json({
+    ok: true,
+    source: "muse_assistant",
+    query: queryText || match.query,
+    answer: match.answer,
+    serverTime: new Date().toISOString()
+  });
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -150,6 +277,10 @@ export default {
     if (request.method === "POST" && url.pathname === "/v1/results/batch") {
       return handleBatch(request, env);
     }
+    if (request.method === "POST" && (url.pathname === "/v1/muse/query" || url.pathname === "/v1/muse")) {
+      return handleMuseQuery(request, env);
+    }
     return json({ error: "not_found" }, 404);
   },
 };
+

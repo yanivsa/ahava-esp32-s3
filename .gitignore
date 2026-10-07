@@ -11,3 +11,4 @@ reset_*.py
 include/wifi_credentials.local.h
 src/engine/generated_ori_religion.inc
 include/results_sync_secret.h
+include/muse_secret.h
