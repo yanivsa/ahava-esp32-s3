@@ -30,7 +30,17 @@ patch(
     '''    if len(values) != 4:\n        raise RuntimeError(f"Need three distinct plausible distractors for {correct!r}; got {values!r}")\n''',
 )
 
-# Avoid duplicate intermediate distractors in simple fraction multiplication.
+# Cancellation-path distractors must be distinct from the correct reduced
+# expression. Use three different common mistakes: only denominator reduced,
+# only whole factor reduced, and numerator changed after otherwise-correct
+# cancellation.
+patch(
+    "scripts/generate_ori_exam_prep_questions.py",
+    '''            w1_wrong = [f"{whole} × {num}/{cd}", f"{cw} × {num}/{den}", f"{g} × {num}/{cd}"]\n''',
+    '''            w1_wrong = [f"{whole} × {num}/{cd}", f"{cw} × {num}/{den}", f"{cw} × {num + 1}/{cd}"]\n''',
+)
+
+# Avoid duplicate intermediate distractors when no cancellation is available.
 patch(
     "scripts/generate_ori_exam_prep_questions.py",
     '''            w1_wrong = [f"{whole + num}/{den}", f"{whole * num}/{den + 1}", f"{whole * num + 1}/{den}"]\n''',
