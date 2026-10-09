@@ -196,7 +196,7 @@ static void audio_task_worker(void *pvParameters) {
 static void audio_record_task_worker(void *pvParameters) {
     (void)pvParameters;
     const size_t CHUNK_SAMPLES = 256;
-    int16_t rx_raw[CHUNK_SAMPLES * 2]; // 16-bit stereo chunk
+    static int16_t rx_raw[CHUNK_SAMPLES * 2]; // Static buffer to preserve task stack
 
     Serial.printf("[AUDIO] FreeRTOS recording task started on Core %d\n", xPortGetCoreID());
 
@@ -405,7 +405,7 @@ bool audio_manager_init(void) {
     BaseType_t rec_status = xTaskCreatePinnedToCore(
         audio_record_task_worker,
         "audio_rec_task",
-        3072,
+        6144, // 6 KB stack
         NULL,
         BSP_AUDIO_TASK_PRIORITY,
         &s_record_task_handle,
@@ -506,7 +506,6 @@ bool audio_record_start(void) {
 size_t audio_record_stop(void) {
     if (!s_is_recording) return s_record_bytes;
     s_is_recording = false;
-    vTaskDelay(pdMS_TO_TICKS(60));
     return s_record_bytes;
 }
 

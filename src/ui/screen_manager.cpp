@@ -79,6 +79,14 @@ static lv_obj_t *s_active_sys_vol_lbl = NULL;
 static lv_obj_t *s_active_sys_vol_slider = NULL;
 static lv_timer_t *s_live_status_timer = NULL;
 
+/* Live Muse Assistant UI handles */
+static lv_obj_t *s_muse_chat_lbl = NULL;
+static lv_obj_t *s_muse_status_lbl = NULL;
+static lv_obj_t *s_muse_ptt_btn = NULL;
+static lv_obj_t *s_muse_ptt_lbl = NULL;
+static lv_obj_t *s_muse_orb = NULL;
+lv_obj_t *s_muse_wifi_lbl = NULL;
+
 static void ui_live_status_timer_cb(lv_timer_t *timer) {
     (void)timer;
 
@@ -195,6 +203,12 @@ static void on_back_to_profiles_clicked(lv_event_t *e) {
     if (lv_event_get_code(e) == LV_EVENT_CLICKED) {
         audio_play_click();
         muse_manager_cancel();
+        s_muse_chat_lbl = NULL;
+        s_muse_status_lbl = NULL;
+        s_muse_ptt_btn = NULL;
+        s_muse_ptt_lbl = NULL;
+        s_muse_orb = NULL;
+        s_muse_wifi_lbl = NULL;
         current_profile = PROFILE_NONE;
         player_data_set_active_profile(PROFILE_NONE);
         sm_load_screen(SCREEN_PROFILES);
@@ -1480,16 +1494,9 @@ void ui_screen_splash_init(lv_obj_t *scr) {
 /*                         SCREEN BUILDER: MAGIC ASSISTANT (MUSE)             */
 /* ========================================================================== */
 
-static lv_obj_t *s_muse_chat_lbl = NULL;
-static lv_obj_t *s_muse_status_lbl = NULL;
-static lv_obj_t *s_muse_ptt_btn = NULL;
-static lv_obj_t *s_muse_ptt_lbl = NULL;
-static lv_obj_t *s_muse_orb = NULL;
-lv_obj_t *s_muse_wifi_lbl = NULL;
-
 void ui_screen_muse_update_response(const char *query, const char *resp) {
-    if (s_muse_chat_lbl && lv_obj_is_valid(s_muse_chat_lbl)) {
-        static char chat_buf[768];
+    if (current_screen_id == SCREEN_MUSE && s_muse_chat_lbl && lv_obj_is_valid(s_muse_chat_lbl)) {
+        static char chat_buf[1200];
         snprintf(chat_buf, sizeof(chat_buf),
                  "שאלת:\n\"%s\"\n\nתשובת עוזר הקסם:\n%s",
                  query ? query : "",
@@ -1500,12 +1507,14 @@ void ui_screen_muse_update_response(const char *query, const char *resp) {
 }
 
 void ui_screen_muse_update_status(const char *status, uint32_t color_hex) {
-    if (s_muse_status_lbl && lv_obj_is_valid(s_muse_status_lbl)) {
-        lv_label_set_text(s_muse_status_lbl, status);
-        lv_obj_set_style_text_color(s_muse_status_lbl, lv_color_hex(color_hex), LV_PART_MAIN);
-    }
-    if (s_muse_orb && lv_obj_is_valid(s_muse_orb)) {
-        lv_obj_set_style_bg_color(s_muse_orb, lv_color_hex(color_hex), LV_PART_MAIN);
+    if (current_screen_id == SCREEN_MUSE) {
+        if (s_muse_status_lbl && lv_obj_is_valid(s_muse_status_lbl)) {
+            lv_label_set_text(s_muse_status_lbl, status);
+            lv_obj_set_style_text_color(s_muse_status_lbl, lv_color_hex(color_hex), LV_PART_MAIN);
+        }
+        if (s_muse_orb && lv_obj_is_valid(s_muse_orb)) {
+            lv_obj_set_style_bg_color(s_muse_orb, lv_color_hex(color_hex), LV_PART_MAIN);
+        }
     }
 }
 

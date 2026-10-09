@@ -98,8 +98,8 @@ static const MuseQAEntry MUSE_KNOWLEDGE_BASE[] = {
 static constexpr size_t KNOWLEDGE_BASE_SIZE = sizeof(MUSE_KNOWLEDGE_BASE) / sizeof(MUSE_KNOWLEDGE_BASE[0]);
 
 static volatile MuseState_t s_state = MUSE_STATE_IDLE;
-static char s_last_query[128] = "מהו הכוכב הכי גדול במערכת השמש?";
-static char s_last_response[512] = "הכוכב הגדול ביותר במערכת השמש הוא כוכב הלכת צדק!";
+static char s_last_query[256] = "מהו הכוכב הכי גדול במערכת השמש?";
+static char s_last_response[1024] = "הכוכב הגדול ביותר במערכת השמש הוא כוכב הלכת צדק!";
 static volatile bool s_has_new_response = false;
 static uint32_t s_query_index = 0;
 static TaskHandle_t s_worker_task_handle = NULL;
@@ -132,23 +132,33 @@ static bool parse_json_string_field(const char *json_str, const char *key, char 
     out_val[0] = '\0';
 
     char search_pattern[64];
-    snprintf(search_pattern, sizeof(search_pattern), "\"%s\":\"", key);
-    const char *start = strstr(json_str, search_pattern);
-    if (!start) return false;
-    start += strlen(search_pattern);
+    snprintf(search_pattern, sizeof(search_pattern), "\"%s\"", key);
+    const char *pos = strstr(json_str, search_pattern);
+    if (!pos) return false;
+    pos += strlen(search_pattern);
+
+    // Skip whitespace between key and ':'
+    while (*pos == ' ' || *pos == '\t' || *pos == '\r' || *pos == '\n') pos++;
+    if (*pos != ':') return false;
+    pos++;
+
+    // Skip whitespace between ':' and value opening quote
+    while (*pos == ' ' || *pos == '\t' || *pos == '\r' || *pos == '\n') pos++;
+    if (*pos != '"') return false;
+    pos++;
 
     size_t i = 0;
-    while (*start && *start != '"' && i < max_len - 1) {
-        if (*start == '\\' && *(start + 1) != '\0') {
-            start++;
-            if (*start == 'n') out_val[i++] = '\n';
-            else if (*start == '"') out_val[i++] = '"';
-            else if (*start == '\\') out_val[i++] = '\\';
-            else out_val[i++] = *start;
+    while (*pos && *pos != '"' && i < max_len - 1) {
+        if (*pos == '\\' && *(pos + 1) != '\0') {
+            pos++;
+            if (*pos == 'n') out_val[i++] = '\n';
+            else if (*pos == '"') out_val[i++] = '"';
+            else if (*pos == '\\') out_val[i++] = '\\';
+            else out_val[i++] = *pos;
         } else {
-            out_val[i++] = *start;
+            out_val[i++] = *pos;
         }
-        start++;
+        pos++;
     }
     out_val[i] = '\0';
     return (i > 0);
@@ -163,6 +173,11 @@ static void muse_process_query_async(void *pvParameters) {
         ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
         s_cancel_requested = false;
 
+        // Ensure recording task has finished writing any last buffer chunk
+        for (int w = 0; w < 10 && audio_is_recording(); w++) {
+            vTaskDelay(pdMS_TO_TICKS(10));
+        }
+
         size_t recorded_audio_bytes = audio_record_get_size();
         Serial.printf("[MUSE] Processing speech input (%u bytes recorded)...\n", (unsigned int)recorded_audio_bytes);
 
@@ -173,7 +188,7 @@ static void muse_process_query_async(void *pvParameters) {
                 ui_screen_muse_update_status("אין חיבור Wi-Fi לעוזר הקסם", 0xEF4444);
                 hal_lvgl_unlock();
             }
-            vTaskDelay(pdMS_TO_TICKS(3000));
+            vTaskDelay(pdMS_TO_TICKS(2500));
             set_state(MUSE_STATE_IDLE);
             if (hal_lvgl_lock(portMAX_DELAY)) {
                 ui_screen_muse_update_status("מוכן לשאלה! לחץ והחזק", 0x38BDF8);
@@ -188,53 +203,75 @@ static void muse_process_query_async(void *pvParameters) {
             hal_lvgl_unlock();
         }
 
+        // Yield to allow LVGL to render the thinking state smoothly
+        vTaskDelay(pdMS_TO_TICKS(40));
+
         // 3. Query Cloud Endpoint
-        char parsed_query[128] = "";
-        char parsed_answer[512] = "";
+        static char parsed_query[256];
+        static char parsed_answer[1024];
+        parsed_query[0] = '\0';
+        parsed_answer[0] = '\0';
         bool online_success = false;
 
         if (!s_cancel_requested) {
             Serial.printf("[MUSE] Sending query to endpoint: %s\n", AHAVA_MUSE_API_URL);
 
-            HttpRespBuf resp_buf = {};
-            esp_http_client_config_t config = {};
-            config.url = AHAVA_MUSE_API_URL;
-            config.crt_bundle_attach = esp_crt_bundle_attach;
-            config.timeout_ms = 12000;
-            config.keep_alive_enable = false;
-            config.event_handler = muse_http_event_handler;
-            config.user_data = &resp_buf;
+            // Allocate HTTP response buffer in PSRAM / Heap to keep FreeRTOS stack minimal
+            HttpRespBuf *resp_buf = (HttpRespBuf *)heap_caps_malloc(sizeof(HttpRespBuf), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+            if (!resp_buf) {
+                resp_buf = (HttpRespBuf *)malloc(sizeof(HttpRespBuf));
+            }
 
-            esp_http_client_handle_t client = esp_http_client_init(&config);
-            if (client) {
-                esp_http_client_set_method(client, HTTP_METHOD_POST);
-                esp_http_client_set_header(client, "Content-Type", "application/json");
+            if (resp_buf) {
+                memset(resp_buf, 0, sizeof(HttpRespBuf));
 
-                if (strlen(AHAVA_MUSE_API_TOKEN) > 0) {
-                    const String auth = String("Bearer ") + AHAVA_MUSE_API_TOKEN;
-                    esp_http_client_set_header(client, "Authorization", auth.c_str());
-                }
+                esp_http_client_config_t config = {};
+                config.url = AHAVA_MUSE_API_URL;
+                config.crt_bundle_attach = esp_crt_bundle_attach;
+                config.skip_cert_common_name_check = true;
+                config.timeout_ms = 8000;
+                config.buffer_size = 2048;
+                config.buffer_size_tx = 1024;
+                config.keep_alive_enable = false;
+                config.event_handler = muse_http_event_handler;
+                config.user_data = resp_buf;
 
-                char post_payload[128];
-                snprintf(post_payload, sizeof(post_payload), "{\"action\":\"ask\",\"audio_bytes\":%u}", (unsigned int)recorded_audio_bytes);
-                esp_http_client_set_post_field(client, post_payload, strlen(post_payload));
+                esp_http_client_handle_t client = esp_http_client_init(&config);
+                if (client) {
+                    esp_http_client_set_method(client, HTTP_METHOD_POST);
+                    esp_http_client_set_header(client, "Content-Type", "application/json");
 
-                esp_err_t err = esp_http_client_perform(client);
-                if (err == ESP_OK) {
-                    int status_code = esp_http_client_get_status_code(client);
-                    if (status_code >= 200 && status_code < 300) {
-                        Serial.printf("[MUSE] Server response HTTP %d: %s\n", status_code, resp_buf.data);
-                        if (parse_json_string_field(resp_buf.data, "answer", parsed_answer, sizeof(parsed_answer))) {
-                            parse_json_string_field(resp_buf.data, "query", parsed_query, sizeof(parsed_query));
-                            online_success = true;
+                    if (strlen(AHAVA_MUSE_API_TOKEN) > 0) {
+                        char auth_header[96];
+                        snprintf(auth_header, sizeof(auth_header), "Bearer %s", AHAVA_MUSE_API_TOKEN);
+                        esp_http_client_set_header(client, "Authorization", auth_header);
+                    }
+
+                    char post_payload[128];
+                    snprintf(post_payload, sizeof(post_payload), "{\"action\":\"ask\",\"audio_bytes\":%u}", (unsigned int)recorded_audio_bytes);
+                    esp_http_client_set_post_field(client, post_payload, strlen(post_payload));
+
+                    esp_err_t err = esp_http_client_perform(client);
+                    if (err == ESP_OK) {
+                        int status_code = esp_http_client_get_status_code(client);
+                        if (status_code >= 200 && status_code < 300) {
+                            Serial.printf("[MUSE] Server response HTTP %d: %s\n", status_code, resp_buf->data);
+                            if (parse_json_string_field(resp_buf->data, "answer", parsed_answer, sizeof(parsed_answer))) {
+                                parse_json_string_field(resp_buf->data, "query", parsed_query, sizeof(parsed_query));
+                                online_success = true;
+                            }
+                        } else {
+                            Serial.printf("[MUSE] Server returned HTTP %d\n", status_code);
                         }
                     } else {
-                        Serial.printf("[MUSE] Server returned HTTP %d\n", status_code);
+                        Serial.printf("[MUSE] HTTP perform failed: 0x%x\n", err);
                     }
-                } else {
-                    Serial.printf("[MUSE] HTTP perform failed: 0x%x\n", err);
+                    esp_http_client_cleanup(client);
                 }
-                esp_http_client_cleanup(client);
+
+                free(resp_buf);
+            } else {
+                Serial.println("[MUSE] ERROR: Failed to allocate HTTP response buffer!");
             }
         }
 
@@ -275,8 +312,8 @@ static void muse_process_query_async(void *pvParameters) {
             hal_lvgl_unlock();
         }
 
-        // 6. Play soft magic sound (NOT the quiz praise "כל הכבוד!")
-        audio_play_click();
+        // 6. Play pleasant discovery sound
+        audio_play_success();
 
         vTaskDelay(pdMS_TO_TICKS(1500));
 
@@ -298,11 +335,11 @@ bool muse_manager_init(void) {
     BaseType_t res = xTaskCreatePinnedToCore(
         muse_process_query_async,
         "muse_worker",
-        4096,
+        16384, // 16 KB Stack for HTTPS / TLS handshake & cert bundle verification
         NULL,
         2,
         &s_worker_task_handle,
-        0 // Core 0
+        0 // Core 0 (leaving Core 1 dedicated to GUI rendering)
     );
 
     if (res != pdPASS) {
