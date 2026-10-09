@@ -1,0 +1,56 @@
+name: Exam prep runtime fix verification
+
+on:
+  push:
+    branches: [plan/exam-prep-fractions]
+    paths:
+      - 'scripts/exam_prep_runtime_fix.py'
+      - '.github/workflows/exam-prep-runtime-fix.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: exam-prep-runtime-fix
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: plan/exam-prep-fractions
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install PlatformIO
+        run: pip install 'platformio==6.1.18'
+      - name: Apply runtime fix
+        run: python scripts/exam_prep_runtime_fix.py
+      - name: Validate strict 70-question bank
+        run: python scripts/generate_ori_exam_prep_questions.py --check
+      - name: Check whitespace
+        run: git diff --check
+      - name: Run all native tests
+        run: pio test -e native
+      - name: Verify cloud results contract
+        run: python scripts/verify_results_cloud_contract.py
+      - name: Build full firmware
+        env:
+          AHAVA_RESULTS_SYNC_TOKEN: ${{ secrets.AHAVA_RESULTS_SYNC_TOKEN }}
+        run: pio run -e spotpear-esp32s3-max35
+      - name: Verify firmware artifact
+        run: |
+          test -s .pio/build/spotpear-esp32s3-max35/firmware.bin
+          sha256sum .pio/build/spotpear-esp32s3-max35/firmware.bin
+      - name: Commit verified runtime fix
+        run: |
+          rm -f .github/workflows/exam-prep-runtime-fix.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'fix: keep exam prep Ori-only at runtime'
+          git push origin HEAD:plan/exam-prep-fractions
