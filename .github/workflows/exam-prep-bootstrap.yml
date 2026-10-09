@@ -5,6 +5,7 @@ on:
     branches: [plan/exam-prep-fractions]
     paths:
       - 'scripts/exam_prep_apply.py'
+      - 'scripts/exam_prep_fix_forward_decl.py'
       - '.github/workflows/exam-prep-bootstrap.yml'
   workflow_dispatch:
 
@@ -34,6 +35,9 @@ jobs:
       - name: Apply deterministic integration patch
         run: python scripts/exam_prep_apply.py
 
+      - name: Apply compile-order fix
+        run: python scripts/exam_prep_fix_forward_decl.py
+
       - name: Validate strict 70-question bank
         run: python scripts/generate_ori_exam_prep_questions.py --check
 
@@ -58,7 +62,7 @@ jobs:
 
       - name: Commit verified implementation
         run: |
-          rm -f scripts/exam_prep_apply.py .github/workflows/exam-prep-bootstrap.yml
+          rm -f scripts/exam_prep_apply.py scripts/exam_prep_fix_forward_decl.py .github/workflows/exam-prep-bootstrap.yml
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add -A
