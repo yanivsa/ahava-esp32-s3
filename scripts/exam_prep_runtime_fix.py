@@ -30,12 +30,20 @@ patch(
     '''    if len(values) != 4:\n        raise RuntimeError(f"Need three distinct plausible distractors for {correct!r}; got {values!r}")\n''',
 )
 
-# Avoid a duplicate first-level intermediate distractor (e.g. 3×1/4 used to
-# generate both 4/4 and another equivalent text fallback).
+# Avoid duplicate intermediate distractors in simple fraction multiplication.
 patch(
     "scripts/generate_ori_exam_prep_questions.py",
     '''            w1_wrong = [f"{whole + num}/{den}", f"{whole * num}/{den + 1}", f"{whole * num + 1}/{den}"]\n''',
     '''            w1_wrong = [f"{whole + num}/{den}", f"{whole * num}/{den + 1}", f"{whole * num + den}/{den}"]\n''',
+)
+
+# Mixed-number conversion distractors must also be genuinely different. The
+# second option is 'correct improper numerator + 1', a realistic off-by-one
+# conversion error that cannot collide with the first distractor.
+patch(
+    "scripts/generate_ori_exam_prep_questions.py",
+    '''        [f"{whole} × {mixed_whole + num}/{den}", f"{whole} × {mixed_whole * den - num}/{den}", f"{whole} × {improper}/{den + 1}"],\n''',
+    '''        [f"{whole} × {mixed_whole + num}/{den}", f"{whole} × {improper + 1}/{den}", f"{whole} × {improper}/{den + 1}"],\n''',
 )
 
 # The hint must match the actual path: when cancellation is impossible, tell
