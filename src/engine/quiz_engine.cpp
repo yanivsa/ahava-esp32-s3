@@ -479,7 +479,7 @@ bool quiz_validate_database(void) {
     }
 
     for (int profile = PROFILE_ORI; profile < PROFILE_MAX; ++profile) {
-        const int subject_count = profile == PROFILE_ETHAN ? AHAVA_SUBJECT_COUNT : AHAVA_SUBJECT_CHALLENGES;
+        const int subject_count = profile == PROFILE_ETHAN ? (AHAVA_SUBJECT_CHALLENGES + 1) : AHAVA_SUBJECT_CHALLENGES;
         for (int subject = 0; subject < subject_count; ++subject) {
             size_t count = selectable_count((WizardProfile_t)profile, subject);
             if (count < 3) {

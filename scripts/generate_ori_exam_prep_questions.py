@@ -80,12 +80,8 @@ def permute(correct: str, wrongs: list[str], slot: int) -> tuple[list[str], int]
             values.append(item)
         if len(values) == 4:
             break
-    k = 1
-    while len(values) < 4:
-        candidate = f"{correct} ({k})"
-        if candidate not in values:
-            values.append(candidate)
-        k += 1
+    if len(values) != 4:
+        raise RuntimeError(f"Need three distinct plausible distractors for {correct!r}; got {values!r}")
     answer = values.pop(0)
     values.insert(slot, answer)
     return values, slot
@@ -121,12 +117,12 @@ def build_question(qid: int, tier: int, kind: str, values: tuple[int, ...]) -> d
         if g > 1:
             cw, cd = whole // g, den // g
             w1 = f"{cw} × {num}/{cd}"
-            w1_wrong = [f"{whole} × {num}/{cd}", f"{cw} × {num}/{den}", f"{g} × {num}/{cd}"]
+            w1_wrong = [f"{whole} × {num}/{cd}", f"{cw} × {num}/{den}", f"{cw} × {num + 1}/{cd}"]
             work_prompt_1 = "מהו הצמצום הנכון לפני הכפל?"
         else:
             cw, cd = whole, den
             w1 = f"{whole * num}/{den}"
-            w1_wrong = [f"{whole + num}/{den}", f"{whole * num}/{den + 1}", f"{whole * num + 1}/{den}"]
+            w1_wrong = [f"{whole + num}/{den}", f"{whole * num}/{den + 1}", f"{whole * num + den}/{den}"]
             work_prompt_1 = "מהו שבר הביניים הנכון אחרי הכפל?"
         w1_options, w1_idx = raw_work_options(w1, w1_wrong, qid, 1)
         work_prompt_2 = "אחרי הצמצום, מהו שבר המכפלה לפני המרה למספר מעורב?" if second else None
@@ -144,7 +140,8 @@ def build_question(qid: int, tier: int, kind: str, values: tuple[int, ...]) -> d
             "workOptions1": w1_options, "workCorrect1": w1_idx,
             "workPrompt2": work_prompt_2, "workOptions2": w2_options, "workCorrect2": w2_idx,
             "options": answers, "correct": correct_idx,
-            "hint": "חפש גורם משותף בין המספר השלם למכנה לפני שמכפילים.",
+            "hint": ("חפש גורם משותף בין המספר השלם למכנה לפני שמכפילים." if g > 1
+                     else "אין צמצום מקדים: כפל את המספר השלם במונה והשאר את המכנה."),
             "feedback": f"דרך יעילה: צמצום אם אפשר, כפל, צמצום סופי והמרה. התוצאה: {fmt(result)}.",
             "exact": f"{result.numerator}/{result.denominator}", "two_step_work": second,
         }
@@ -157,7 +154,7 @@ def build_question(qid: int, tier: int, kind: str, values: tuple[int, ...]) -> d
     w1 = f"{whole} × {improper}/{den}"
     w1_options, w1_idx = raw_work_options(
         w1,
-        [f"{whole} × {mixed_whole + num}/{den}", f"{whole} × {mixed_whole * den - num}/{den}", f"{whole} × {improper}/{den + 1}"],
+        [f"{whole} × {mixed_whole + num}/{den}", f"{whole} × {improper + 1}/{den}", f"{whole} × {improper}/{den + 1}"],
         qid, 1,
     )
     g = math.gcd(whole, den)
