@@ -30,6 +30,7 @@ static ScreenID_t current_screen_id = SCREEN_NONE;
 static const Question_t *current_quiz_question = NULL;
 static lv_obj_t *quiz_answer_btns[4] = { NULL, NULL, NULL, NULL };
 static int current_subject_id = 0;
+static lv_obj_t *quiz_question_lbl = NULL;
 
 /* Child Profiles Metadata */
 static const ProfileInfo_t PROFILES_DATA[] = {
@@ -87,6 +88,8 @@ static lv_obj_t *s_muse_ptt_lbl = NULL;
 static lv_obj_t *s_muse_orb = NULL;
 lv_obj_t *s_muse_wifi_lbl = NULL;
 
+static void format_exam_prep_progress(char *buf, size_t len);
+
 static void ui_live_status_timer_cb(lv_timer_t *timer) {
     (void)timer;
 
@@ -105,7 +108,9 @@ static void ui_live_status_timer_cb(lv_timer_t *timer) {
     if (s_active_hud_today_lbl && lv_obj_is_valid(s_active_hud_today_lbl) && current_profile != PROFILE_NONE) {
         uint32_t questions_today = player_data_get_questions_today(current_profile);
         char today_buf[48];
-        if (current_screen_id == SCREEN_QUIZ) {
+        if (current_screen_id == SCREEN_QUIZ && current_subject_id == AHAVA_SUBJECT_EXAM_PREP) {
+            format_exam_prep_progress(today_buf, sizeof(today_buf));
+        } else if (current_screen_id == SCREEN_QUIZ) {
             snprintf(today_buf, sizeof(today_buf), "%u 🎯", (unsigned int)questions_today);
         } else {
             snprintf(today_buf, sizeof(today_buf), "שאלות: %u 🎯", (unsigned int)questions_today);
@@ -399,12 +404,65 @@ static void on_ota_button_clicked(lv_event_t *e) {
 /*                         QUIZ ANSWER VALIDATION & REWARDS                   */
 /* ========================================================================== */
 
+
+static void format_exam_prep_progress(char *buf, size_t len) {
+    const uint16_t total = player_data_exam_prep_total_solved(PROFILE_ORI);
+    const uint8_t tier = player_data_exam_prep_current_tier(PROFILE_ORI);
+    if (total >= 70 || tier > 7) {
+        snprintf(buf, len, "מאסטר · %u/70", (unsigned)total);
+    } else {
+        snprintf(buf, len, "רמה %u · %u/10 · %u/70", (unsigned)tier,
+                 (unsigned)player_data_exam_prep_tier_solved(PROFILE_ORI, tier),
+                 (unsigned)total);
+    }
+}
+
+static void refresh_exam_prep_quiz_ui(void) {
+    if (!current_quiz_question || current_subject_id != AHAVA_SUBJECT_EXAM_PREP) return;
+    if (quiz_question_lbl && lv_obj_is_valid(quiz_question_lbl)) {
+        char text[512];
+        snprintf(text, sizeof(text), "רמה %u · %s\n✍️ כתוב דרך מלאה במחברת לפני בחירת תשובה.\n%s",
+                 (unsigned)current_quiz_question->difficulty_tier,
+                 current_quiz_question->text,
+                 quiz_get_active_work_prompt());
+        lv_label_set_text(quiz_question_lbl, text);
+    }
+    for (int i = 0; i < 4; ++i) {
+        if (!quiz_answer_btns[i] || !lv_obj_is_valid(quiz_answer_btns[i])) continue;
+        theme_apply_btn_main(quiz_answer_btns[i]);
+        lv_obj_add_flag(quiz_answer_btns[i], LV_OBJ_FLAG_CLICKABLE);
+        lv_obj_t *label = lv_obj_get_child(quiz_answer_btns[i], 0);
+        if (label) lv_label_set_text(label, quiz_get_active_answer_text((uint8_t)i));
+    }
+    if (s_active_hud_today_lbl && lv_obj_is_valid(s_active_hud_today_lbl)) {
+        char progress[64];
+        format_exam_prep_progress(progress, sizeof(progress));
+        lv_label_set_text(s_active_hud_today_lbl, progress);
+    }
+}
+
 static void on_answer_clicked(lv_event_t *e) {
     if (lv_event_get_code(e) != LV_EVENT_CLICKED) return;
     if (!current_quiz_question) return;
 
     uint8_t clicked_idx = (uint8_t)(uintptr_t)lv_event_get_user_data(e);
     lv_obj_t *clicked_btn = (lv_obj_t *)lv_event_get_target(e);
+
+    if (current_subject_id == AHAVA_SUBJECT_EXAM_PREP && quiz_get_phase() != QUIZ_PHASE_FINAL) {
+        const bool work_ok = quiz_check_work_choice(clicked_idx);
+        if (!work_ok) {
+            audio_play_fail();
+            if (clicked_btn) {
+                lv_obj_set_style_bg_color(clicked_btn, lv_color_hex(0xEF4444), LV_PART_MAIN);
+                lv_obj_set_style_border_color(clicked_btn, lv_color_hex(0xF87171), LV_PART_MAIN);
+            }
+            return;
+        }
+        audio_play_click();
+        refresh_exam_prep_quiz_ui();
+        return;
+    }
+
     bool is_correct = (clicked_idx == current_quiz_question->correct_idx);
 
     Serial.printf("[QUIZ] Answer clicked: %u (Correct: %u) -> %s\n",
@@ -433,8 +491,12 @@ static void on_answer_clicked(lv_event_t *e) {
                   (int)current_profile, today_count);
 
     if (s_active_hud_today_lbl && lv_obj_is_valid(s_active_hud_today_lbl)) {
-        char today_buf[48];
-        snprintf(today_buf, sizeof(today_buf), "%u 🎯", (unsigned int)today_count);
+        char today_buf[64];
+        if (current_subject_id == AHAVA_SUBJECT_EXAM_PREP) {
+            format_exam_prep_progress(today_buf, sizeof(today_buf));
+        } else {
+            snprintf(today_buf, sizeof(today_buf), "%u 🎯", (unsigned int)today_count);
+        }
         lv_label_set_text(s_active_hud_today_lbl, today_buf);
     }
 
@@ -631,7 +693,11 @@ void ui_screen_quiz_init(lv_obj_t *scr) {
     lv_obj_t *lbl_today = lv_label_create(hud);
     char today_buf[48];
     uint32_t questions_today = player_data_get_questions_today(current_profile);
-    snprintf(today_buf, sizeof(today_buf), "%u 🎯", (unsigned int)questions_today);
+    if (current_subject_id == AHAVA_SUBJECT_EXAM_PREP) {
+        format_exam_prep_progress(today_buf, sizeof(today_buf));
+    } else {
+        snprintf(today_buf, sizeof(today_buf), "%u 🎯", (unsigned int)questions_today);
+    }
     lv_label_set_text(lbl_today, today_buf);
     lv_obj_set_style_text_font(lbl_today, &lv_font_hebrew_16, LV_PART_MAIN);
     lv_obj_set_style_text_color(lbl_today, lv_color_hex(0x38BDF8), LV_PART_MAIN);
@@ -676,6 +742,7 @@ void ui_screen_quiz_init(lv_obj_t *scr) {
     lv_obj_remove_flag(question_card, LV_OBJ_FLAG_SCROLLABLE);
 
     lv_obj_t *q_label = lv_label_create(question_card);
+    quiz_question_lbl = q_label;
     lv_label_set_text(q_label, current_quiz_question ? current_quiz_question->text : "טוען שאלה...");
     lv_obj_set_width(q_label, 250);
     lv_label_set_long_mode(q_label, LV_LABEL_LONG_WRAP);
@@ -710,7 +777,7 @@ void ui_screen_quiz_init(lv_obj_t *scr) {
         lv_obj_add_event_cb(btn, on_answer_clicked, LV_EVENT_CLICKED, (void *)(uintptr_t)i);
 
         lv_obj_t *btn_lbl = lv_label_create(btn);
-        lv_label_set_text(btn_lbl, current_quiz_question ? current_quiz_question->answers[i] : "");
+        lv_label_set_text(btn_lbl, current_quiz_question ? quiz_get_active_answer_text((uint8_t)i) : "");
         lv_obj_set_width(btn_lbl, 124);
         lv_label_set_long_mode(btn_lbl, LV_LABEL_LONG_WRAP);
         lv_obj_set_style_text_font(btn_lbl, (current_profile == PROFILE_AYALA) ? &lv_font_hebrew_24 : &lv_font_hebrew_16, LV_PART_MAIN);
@@ -721,6 +788,7 @@ void ui_screen_quiz_init(lv_obj_t *scr) {
 
         quiz_answer_btns[i] = btn;
     }
+    if (current_subject_id == AHAVA_SUBJECT_EXAM_PREP) refresh_exam_prep_quiz_ui();
 }
 
 /* ========================================================================== */
@@ -1366,7 +1434,7 @@ void ui_screen_dashboard_init(lv_obj_t *scr) {
         titles[2] = "אנגלית יסודי"; emojis[2] = "🔤";
         titles[3] = "מסורת ישראל"; emojis[3] = "🕍";
         titles[AHAVA_SUBJECT_CHALLENGES] = "חִידוֹת הַקּוֹסְמִים"; emojis[AHAVA_SUBJECT_CHALLENGES] = "";
-        subject_count = AHAVA_SUBJECT_COUNT;
+        subject_count = AHAVA_SUBJECT_CHALLENGES + 1;
     } else {
         titles[0] = "מתמטיקה"; emojis[0] = "📐";
         titles[1] = "הבנת הנקרא ולשון"; emojis[1] = "📚";
@@ -1406,6 +1474,42 @@ void ui_screen_dashboard_init(lv_obj_t *scr) {
         lv_label_set_text(play_lbl, "שחק");
         lv_obj_set_style_text_font(play_lbl, &lv_font_hebrew_24, LV_PART_MAIN);
         lv_obj_center(play_lbl);
+    }
+
+
+    if (current_profile == PROFILE_ORI) {
+        lv_obj_t *exam_card = lv_obj_create(scroll);
+        theme_apply_card(exam_card);
+        lv_obj_set_size(exam_card, 290, 115);
+        lv_obj_set_style_border_color(exam_card, lv_color_hex(0xF59E0B), LV_PART_MAIN);
+        lv_obj_remove_flag(exam_card, LV_OBJ_FLAG_SCROLLABLE);
+
+        lv_obj_t *exam_title = lv_label_create(exam_card);
+        lv_label_set_text(exam_title, "הכנה למבחן");
+        lv_obj_set_style_text_font(exam_title, &lv_font_hebrew_24, LV_PART_MAIN);
+        lv_obj_set_style_text_color(exam_title, lv_color_hex(0xFFFFFF), LV_PART_MAIN);
+        lv_obj_set_style_base_dir(exam_title, LV_BASE_DIR_RTL, LV_PART_MAIN);
+        lv_obj_align(exam_title, LV_ALIGN_TOP_RIGHT, 0, 0);
+
+        lv_obj_t *exam_progress = lv_label_create(exam_card);
+        char progress[64];
+        format_exam_prep_progress(progress, sizeof(progress));
+        lv_label_set_text(exam_progress, progress);
+        lv_obj_set_style_text_font(exam_progress, &lv_font_hebrew_16, LV_PART_MAIN);
+        lv_obj_set_style_text_color(exam_progress, lv_color_hex(0xFBBF24), LV_PART_MAIN);
+        lv_obj_set_style_base_dir(exam_progress, LV_BASE_DIR_RTL, LV_PART_MAIN);
+        lv_obj_align(exam_progress, LV_ALIGN_TOP_RIGHT, 0, 30);
+
+        lv_obj_t *exam_btn = lv_button_create(exam_card);
+        theme_apply_btn_main(exam_btn);
+        lv_obj_set_size(exam_btn, 120, 40);
+        lv_obj_align(exam_btn, LV_ALIGN_BOTTOM_MID, 0, 0);
+        lv_obj_add_event_cb(exam_btn, on_play_subject_clicked, LV_EVENT_CLICKED,
+                            (void*)(uintptr_t)AHAVA_SUBJECT_EXAM_PREP);
+        lv_obj_t *exam_lbl = lv_label_create(exam_btn);
+        lv_label_set_text(exam_lbl, "תרגל");
+        lv_obj_set_style_text_font(exam_lbl, &lv_font_hebrew_24, LV_PART_MAIN);
+        lv_obj_center(exam_lbl);
     }
 
     /* ---------------------------------------------------------------------- */
@@ -1709,6 +1813,8 @@ void sm_load_screen(ScreenID_t screen_id) {
     s_muse_ptt_lbl = NULL;
     s_muse_orb = NULL;
     s_muse_wifi_lbl = NULL;
+    quiz_question_lbl = NULL;
+    for (int i = 0; i < 4; ++i) quiz_answer_btns[i] = NULL;
 
     // 1. Create fresh screen object in PSRAM
     lv_obj_t *new_scr = lv_obj_create(NULL);

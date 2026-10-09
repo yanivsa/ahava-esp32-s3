@@ -6,6 +6,9 @@
 #include "audio_manager.h"
 #include "player_data.h"
 #include "quiz_policy.h"
+#include "exam_prep_contract.h"
+#include "exam_prep_progress.h"
+#include "exam_prep_workflow.h"
 #include "theme_manager.h"
 #include <Arduino.h>
 #include <cstring>
@@ -14,19 +17,23 @@ namespace {
 #include "generated_questions.inc"
 #include "generated_ori_religion.inc"
 #include "generated_ori_math.inc"
+#include "generated_ori_exam_prep.inc"
 
 constexpr size_t BASE_QUESTION_COUNT = sizeof(QUESTIONS) / sizeof(QUESTIONS[0]);
 constexpr size_t ORI_RELIGION_COUNT =
     sizeof(ORI_RELIGION_QUESTIONS) / sizeof(ORI_RELIGION_QUESTIONS[0]);
 constexpr size_t ORI_MATH_COUNT =
     sizeof(ORI_MATH_QUESTIONS) / sizeof(ORI_MATH_QUESTIONS[0]);
-constexpr size_t QUESTION_COUNT = BASE_QUESTION_COUNT + ORI_RELIGION_COUNT + ORI_MATH_COUNT;
+constexpr size_t ORI_EXAM_PREP_COUNT =
+    sizeof(ORI_EXAM_PREP_QUESTIONS) / sizeof(ORI_EXAM_PREP_QUESTIONS[0]);
+constexpr size_t QUESTION_COUNT = BASE_QUESTION_COUNT + ORI_RELIGION_COUNT + ORI_MATH_COUNT + ORI_EXAM_PREP_COUNT;
 constexpr uint8_t RETRY_COOLDOWN_QUESTIONS = 2;
 
 static uint16_t retry_cursor[PROFILE_MAX][AHAVA_SUBJECT_COUNT] = {};
 static uint8_t retry_cooldown[PROFILE_MAX][AHAVA_SUBJECT_COUNT] = {};
 static const Question_t *active_question = nullptr;
 static int hinted_question_id = -1;
+static ExamPrepWorkState_t exam_work_state = {EXAM_WORK_FINAL, 0, 0, false};
 
 struct EventProxy {
     lv_event_cb_t original_cb = nullptr;
@@ -40,12 +47,27 @@ static bool valid_profile(WizardProfile_t profile) {
     return profile > PROFILE_NONE && profile < PROFILE_MAX;
 }
 
+static void activate_question(const Question_t *q) {
+    active_question = q;
+    hinted_question_id = -1;
+    if (q && q->subject_id == AHAVA_SUBJECT_EXAM_PREP) {
+        const bool has_second = q->work_prompt_2 && *q->work_prompt_2;
+        exam_prep_workflow_reset(&exam_work_state, q->work_correct_idx_1,
+                                 has_second, q->work_correct_idx_2);
+    } else {
+        exam_work_state.phase = EXAM_WORK_FINAL;
+        exam_work_state.has_second = false;
+    }
+}
+
 static const Question_t* question_at(size_t index) {
     if (index < BASE_QUESTION_COUNT) return &QUESTIONS[index];
     index -= BASE_QUESTION_COUNT;
     if (index < ORI_RELIGION_COUNT) return &ORI_RELIGION_QUESTIONS[index];
     index -= ORI_RELIGION_COUNT;
     if (index < ORI_MATH_COUNT) return &ORI_MATH_QUESTIONS[index];
+    index -= ORI_MATH_COUNT;
+    if (index < ORI_EXAM_PREP_COUNT) return &ORI_EXAM_PREP_QUESTIONS[index];
     return nullptr;
 }
 
@@ -136,6 +158,7 @@ static const char* get_subject_name_hebrew(WizardProfile_t profile, int subject_
             case 1: return "הבנת הנקרא ולשון";
             case 2: return "אנגלית";
             case 3: return "יהדות והלכה";
+            case AHAVA_SUBJECT_EXAM_PREP: return "הכנה למבחן";
             default: return "לימוד";
         }
     }
@@ -311,20 +334,29 @@ static void answer_proxy_clicked(lv_event_t *e) {
 
     const uint8_t clicked_idx =
         static_cast<uint8_t>(reinterpret_cast<uintptr_t>(proxy->original_user_data));
+    if (active_question->subject_id == AHAVA_SUBJECT_EXAM_PREP &&
+        exam_work_state.phase != EXAM_WORK_FINAL) {
+        return;  // screen_manager consumes the mandatory work checkpoint.
+    }
+
     const bool correct = clicked_idx == active_question->correct_idx;
     const bool hint_already_used = hinted_question_id == active_question->id;
     const WizardProfile_t profile = active_question->target_profile;
     const int subject_id = active_question->subject_id;
-    const int stats_subject_id = subject_id == AHAVA_SUBJECT_CHALLENGES
-        ? active_question->stats_subject_id
-        : subject_id;
+    const int stats_subject_id =
+        (subject_id == AHAVA_SUBJECT_CHALLENGES || subject_id == AHAVA_SUBJECT_EXAM_PREP)
+            ? active_question->stats_subject_id : subject_id;
     const int ordinal = question_ordinal(active_question);
 
     if (correct || hint_already_used) {
-        const bool eligible = quiz_policy_should_count(correct, hint_already_used);
+        if (subject_id == AHAVA_SUBJECT_EXAM_PREP && correct && ordinal >= 0) {
+            player_data_exam_prep_mark_solved(profile, (uint16_t)ordinal);
+        }
+        const bool eligible = quiz_policy_grants_timeplus_credit(subject_id) &&
+                              quiz_policy_should_count(correct, hint_already_used);
         player_data_prepare_question_count(profile, subject_id, stats_subject_id, eligible);
 
-        if (ordinal >= 0) {
+        if (ordinal >= 0 && subject_id != AHAVA_SUBJECT_EXAM_PREP) {
             if (eligible) {
                 player_data_retry_set(profile, subject_id, (uint16_t)ordinal, false);
             } else {
@@ -338,7 +370,7 @@ static void answer_proxy_clicked(lv_event_t *e) {
 
     /* First wrong answer: persist it for later, show a hint, and do not advance. */
     hinted_question_id = active_question->id;
-    if (ordinal >= 0) {
+    if (ordinal >= 0 && subject_id != AHAVA_SUBJECT_EXAM_PREP) {
         player_data_retry_set(profile, subject_id, (uint16_t)ordinal, true);
         retry_cooldown[profile][subject_id] = RETRY_COOLDOWN_QUESTIONS;
     }
@@ -398,6 +430,11 @@ bool quiz_validate_database(void) {
                       (unsigned)ORI_MATH_COUNT);
         ok = false;
     }
+    if (ORI_EXAM_PREP_COUNT != EXAM_PREP_QUESTION_COUNT) {
+        Serial.printf("[QUIZ] Expected 70 Ori exam-prep questions, got %u\n",
+                      (unsigned)ORI_EXAM_PREP_COUNT);
+        ok = false;
+    }
 
     for (size_t i = 0; i < QUESTION_COUNT; ++i) {
         const Question_t *qp = question_at(i);
@@ -420,8 +457,16 @@ bool quiz_validate_database(void) {
             if (q.target_profile != PROFILE_ORI || q.subject_id != 3 || !q.hint || !*q.hint) {
                 row_ok = false;
             }
-        } else if (i >= BASE_QUESTION_COUNT + ORI_RELIGION_COUNT) {
-            if (q.target_profile != PROFILE_ORI || q.subject_id != 0 || !q.hint || !*q.hint) {
+        } else if (i < BASE_QUESTION_COUNT + ORI_RELIGION_COUNT + ORI_MATH_COUNT) {
+            if (q.target_profile != PROFILE_ORI || q.subject_id != AHAVA_SUBJECT_MATH || !q.hint || !*q.hint) {
+                row_ok = false;
+            }
+        } else {
+            const bool second_ok = !q.work_prompt_2 || !*q.work_prompt_2 || q.work_correct_idx_2 <= 3;
+            if (q.target_profile != PROFILE_ORI || q.subject_id != AHAVA_SUBJECT_EXAM_PREP ||
+                !q.hint || !*q.hint || !exam_prep_tier_valid(q.difficulty_tier) ||
+                !exam_prep_operation_valid(q.exam_prep_operation) || !q.work_prompt_1 ||
+                !*q.work_prompt_1 || q.work_correct_idx_1 > 3 || !second_ok || q.stats_subject_id != -1) {
                 row_ok = false;
             }
         }
@@ -445,21 +490,62 @@ bool quiz_validate_database(void) {
         }
     }
 
+    const size_t exam_count = selectable_count(PROFILE_ORI, AHAVA_SUBJECT_EXAM_PREP);
+    if (exam_count != EXAM_PREP_QUESTION_COUNT) {
+        Serial.printf("[QUIZ] Expected 70 Ori exam-prep questions, got %u\n", (unsigned)exam_count);
+        ok = false;
+    }
+
     const size_t challenge_count = selectable_count(PROFILE_ETHAN, AHAVA_SUBJECT_CHALLENGES);
     if (challenge_count != 1152) {
         Serial.printf("[QUIZ] Expected 1152 Eitan wizard challenges, got %u\n", (unsigned)challenge_count);
         ok = false;
     }
 
-    Serial.printf("[QUIZ] Database validation: %u rows (%u Ori Judaism, %u Ori Math), %s\n",
+    Serial.printf("[QUIZ] Database validation: %u rows (%u Ori Judaism, %u Ori Math, %u Exam Prep), %s\n",
                   (unsigned)QUESTION_COUNT, (unsigned)ORI_RELIGION_COUNT, (unsigned)ORI_MATH_COUNT,
-                  ok ? "PASS" : "FAIL");
+                  (unsigned)ORI_EXAM_PREP_COUNT, ok ? "PASS" : "FAIL");
     return ok;
+}
+
+
+static const Question_t* next_exam_prep_question(WizardProfile_t profile) {
+    if (profile != PROFILE_ORI || ORI_EXAM_PREP_COUNT != EXAM_PREP_QUESTION_COUNT) return nullptr;
+
+    const uint16_t total = player_data_exam_prep_total_solved(profile);
+    uint8_t tier = player_data_exam_prep_current_tier(profile);
+    const bool master = total >= EXAM_PREP_QUESTION_COUNT;
+    const uint16_t start = master ? 0u : (uint16_t)(tier - 1u) * EXAM_PREP_PER_TIER;
+    const uint16_t span = master ? EXAM_PREP_QUESTION_COUNT : EXAM_PREP_PER_TIER;
+
+    uint32_t seq = player_data_get_quiz_seq(profile, AHAVA_SUBJECT_EXAM_PREP);
+    uint32_t seed = player_data_get_quiz_seed(profile, AHAVA_SUBJECT_EXAM_PREP);
+    if (seed == 0u) seed = 1u;
+    const uint32_t stride = compute_coprime_stride(span);
+
+    for (uint16_t attempt = 0; attempt < span; ++attempt) {
+        const uint16_t local = (uint16_t)(((seed - 1u + (seq + attempt) * stride) % span));
+        const uint16_t ordinal = start + local;
+        if (!master && player_data_exam_prep_is_solved(profile, ordinal)) continue;
+        player_data_set_quiz_seq(profile, AHAVA_SUBJECT_EXAM_PREP, seq + attempt + 1u);
+        const Question_t *q = &ORI_EXAM_PREP_QUESTIONS[ordinal];
+        activate_question(q);
+        Serial.printf("[EXAM_PREP] tier=%u mastered=%u/70 question=%d ordinal=%u.\n",
+                      (unsigned)(master ? 8u : tier), (unsigned)total, q->id, (unsigned)ordinal);
+        return q;
+    }
+
+    // Defensive recovery if persistence changed between reads: advance tier on next load.
+    player_data_set_quiz_seq(profile, AHAVA_SUBJECT_EXAM_PREP, seq + span);
+    return nullptr;
 }
 
 const Question_t* quiz_get_next_question(WizardProfile_t profile, int subject_id) {
     if (!valid_profile(profile) || !ahava_subject_valid(subject_id)) return nullptr;
     if (subject_id == AHAVA_SUBJECT_CHALLENGES && profile != PROFILE_ETHAN) return nullptr;
+    if (subject_id == AHAVA_SUBJECT_EXAM_PREP) {
+        return profile == PROFILE_ORI ? next_exam_prep_question(profile) : nullptr;
+    }
 
     if (daily_limit_reached(profile, subject_id)) {
         Serial.printf("[QUIZ] Daily limit reached profile=%d subject=%d.\n",
@@ -483,8 +569,7 @@ const Question_t* quiz_get_next_question(WizardProfile_t profile, int subject_id
                 retry_cursor[profile][subject_id] =
                     (uint16_t)(((uint16_t)retry_ordinal + 1) % (uint16_t)count);
                 retry_cooldown[profile][subject_id] = RETRY_COOLDOWN_QUESTIONS;
-                active_question = retry_q;
-                hinted_question_id = -1;
+                activate_question(retry_q);
                 Serial.printf("[QUIZ] Retry question id=%d profile=%d subject=%d ordinal=%d\n",
                               retry_q->id, (int)profile, subject_id, retry_ordinal);
                 return retry_q;
@@ -516,8 +601,7 @@ const Question_t* quiz_get_next_question(WizardProfile_t profile, int subject_id
 
     const Question_t *q = question_by_ordinal(profile, subject_id, (uint16_t)target_ordinal);
     if (q) {
-        active_question = q;
-        hinted_question_id = -1;
+        activate_question(q);
         Serial.printf("[QUIZ] Question id=%d profile=%d subject=%d seq=%u/%u ordinal=%u\n",
                       q->id, (int)profile, subject_id, (unsigned)seq, (unsigned)count, (unsigned)target_ordinal);
         return q;
@@ -532,12 +616,40 @@ size_t quiz_get_total_questions(void) {
 size_t quiz_get_question_count(WizardProfile_t profile, int subject_id) {
     if (!valid_profile(profile) || subject_id < -1 || subject_id >= AHAVA_SUBJECT_COUNT) return 0;
     if (subject_id == AHAVA_SUBJECT_CHALLENGES && profile != PROFILE_ETHAN) return 0;
+    if (subject_id == AHAVA_SUBJECT_EXAM_PREP && profile != PROFILE_ORI) return 0;
     size_t count = 0;
     for (size_t i = 0; i < QUESTION_COUNT; ++i) {
         const Question_t *q = question_at(i);
         if (selectable_for_profile(i, q, profile, subject_id)) ++count;
     }
     return count;
+}
+
+
+QuizPhase_t quiz_get_phase(void) {
+    if (!active_question || active_question->subject_id != AHAVA_SUBJECT_EXAM_PREP) return QUIZ_PHASE_FINAL;
+    if (exam_work_state.phase == EXAM_WORK_1) return QUIZ_PHASE_WORK_1;
+    if (exam_work_state.phase == EXAM_WORK_2) return QUIZ_PHASE_WORK_2;
+    return QUIZ_PHASE_FINAL;
+}
+
+bool quiz_check_work_choice(uint8_t selected_idx) {
+    if (!active_question || active_question->subject_id != AHAVA_SUBJECT_EXAM_PREP || selected_idx > 3) return false;
+    return exam_prep_workflow_choose(&exam_work_state, selected_idx);
+}
+
+const char* quiz_get_active_answer_text(uint8_t index) {
+    if (!active_question || index > 3) return "";
+    if (quiz_get_phase() == QUIZ_PHASE_WORK_1) return active_question->work_answers_1[index];
+    if (quiz_get_phase() == QUIZ_PHASE_WORK_2) return active_question->work_answers_2[index];
+    return active_question->answers[index];
+}
+
+const char* quiz_get_active_work_prompt(void) {
+    if (!active_question) return "";
+    if (quiz_get_phase() == QUIZ_PHASE_WORK_1) return active_question->work_prompt_1 ? active_question->work_prompt_1 : "";
+    if (quiz_get_phase() == QUIZ_PHASE_WORK_2) return active_question->work_prompt_2 ? active_question->work_prompt_2 : "";
+    return "בחר את התשובה הסופית המצומצמת.";
 }
 
 lv_event_dsc_t* quiz_register_event_cb(lv_obj_t *obj, lv_event_cb_t cb,
