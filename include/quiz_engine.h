@@ -16,27 +16,40 @@ extern "C" {
 #endif
 
 typedef struct {
-    int id;                          /**< Unique Question ID */
-    int subject_id;                  /**< 0 Math, 1 Hebrew, 2 English, 3 Judaism, 4 Wizard Challenges */
-    WizardProfile_t target_profile;  /**< Ori, Ethan, Ayala */
-    const char *text;                /**< Question prompt */
-    const char *answers[4];          /**< Four multiple-choice options */
-    uint8_t correct_idx;             /**< 0-3 index of the correct answer */
-    const char *feedback;            /**< Final explanation after the question ends */
-    const char *hint;                /**< First-error hint; should not reveal the answer */
-    int8_t stats_subject_id;           /**< Academic stats bucket 0..3; separate from navigation subject */
+    int id;
+    int subject_id;
+    WizardProfile_t target_profile;
+    const char *text;
+    const char *answers[4];
+    uint8_t correct_idx;
+    const char *feedback;
+    const char *hint;
+    int8_t stats_subject_id;
+    uint8_t difficulty_tier;          /**< 0 legacy, 1..7 exam prep */
+    uint8_t exam_prep_operation;     /**< 0 legacy, 1 fraction×whole, 2 mixed×whole */
+    const char *work_prompt_1;
+    const char *work_answers_1[4];
+    uint8_t work_correct_idx_1;
+    const char *work_prompt_2;       /**< Optional second checkpoint */
+    const char *work_answers_2[4];
+    uint8_t work_correct_idx_2;
 } Question_t;
+
+typedef enum {
+    QUIZ_PHASE_WORK_1 = 1,
+    QUIZ_PHASE_WORK_2 = 2,
+    QUIZ_PHASE_FINAL = 3
+} QuizPhase_t;
 
 const Question_t* quiz_get_next_question(WizardProfile_t profile, int subject_id);
 bool quiz_validate_database(void);
 size_t quiz_get_total_questions(void);
 size_t quiz_get_question_count(WizardProfile_t profile, int subject_id);
+QuizPhase_t quiz_get_phase(void);
+bool quiz_check_work_choice(uint8_t selected_idx);
+const char* quiz_get_active_answer_text(uint8_t index);
+const char* quiz_get_active_work_prompt(void);
 
-/**
- * Register an LVGL event callback. Answer-button callbacks are proxied so a
- * first wrong answer shows q->hint and keeps the same question active. All
- * other callbacks are forwarded unchanged.
- */
 lv_event_dsc_t* quiz_register_event_cb(lv_obj_t *obj, lv_event_cb_t cb,
                                       lv_event_code_t filter, void *user_data,
                                       const char *callback_name);
@@ -45,12 +58,6 @@ lv_event_dsc_t* quiz_register_event_cb(lv_obj_t *obj, lv_event_cb_t cb,
 }
 #endif
 
-/*
- * screen_manager.cpp already uses lv_obj_add_event_cb everywhere. Wrapping the
- * registration here lets the quiz add first-error hints without duplicating
- * the screen manager. quiz_engine.cpp undefines this macro before it calls the
- * real LVGL function.
- */
 #ifndef QUIZ_ENGINE_DISABLE_EVENT_PROXY
 #define lv_obj_add_event_cb(obj, cb, filter, user_data) \
     quiz_register_event_cb((obj), (cb), (filter), (user_data), #cb)

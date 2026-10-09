@@ -6,6 +6,7 @@
 #include "player_data.h"
 #include "subjects.h"
 #include "quiz_policy.h"
+#include "exam_prep_progress.h"
 #include "time_service.h"
 #include "weekly_stats_store.h"
 #include "results_sync_store.h"
@@ -540,6 +541,63 @@ void player_data_set_active_profile(WizardProfile_t profile) {
     nvs_write_u32_val("act_prof", (uint32_t)profile);
 }
 
+static bool exam_prep_load_words(WizardProfile_t profile, uint32_t words[3]) {
+    if (!words) return false;
+    memset(words, 0, sizeof(uint32_t) * EXAM_PREP_PROGRESS_WORDS);
+    if (profile != PROFILE_ORI) return false;
+    nvs_handle_t handle;
+    if (nvs_open(NVS_STORAGE_NAMESPACE, NVS_READONLY, &handle) != ESP_OK) return true;
+    size_t size = sizeof(uint32_t) * EXAM_PREP_PROGRESS_WORDS;
+    esp_err_t err = nvs_get_blob(handle, "exam_prep_1", words, &size);
+    nvs_close(handle);
+    return err == ESP_OK || err == ESP_ERR_NVS_NOT_FOUND;
+}
+
+static bool exam_prep_save_words(WizardProfile_t profile, const uint32_t words[3]) {
+    if (profile != PROFILE_ORI || !words) return false;
+    nvs_handle_t handle;
+    if (nvs_open(NVS_STORAGE_NAMESPACE, NVS_READWRITE, &handle) != ESP_OK) return false;
+    esp_err_t err = nvs_set_blob(handle, "exam_prep_1", words,
+                                 sizeof(uint32_t) * EXAM_PREP_PROGRESS_WORDS);
+    if (err == ESP_OK) err = nvs_commit(handle);
+    nvs_close(handle);
+    return err == ESP_OK;
+}
+
+bool player_data_exam_prep_is_solved(WizardProfile_t profile, uint16_t ordinal) {
+    uint32_t words[3] = {};
+    exam_prep_load_words(profile, words);
+    return exam_prep_progress_is_solved(words, ordinal);
+}
+
+void player_data_exam_prep_mark_solved(WizardProfile_t profile, uint16_t ordinal) {
+    if (profile != PROFILE_ORI || ordinal >= EXAM_PREP_QUESTION_COUNT) return;
+    uint32_t words[3] = {};
+    exam_prep_load_words(profile, words);
+    if (exam_prep_progress_is_solved(words, ordinal)) return;
+    exam_prep_progress_mark_solved(words, ordinal);
+    exam_prep_save_words(profile, words);
+    Serial.printf("[EXAM_PREP] Mastered ordinal=%u total=%u/70.\n",
+                  (unsigned)ordinal, (unsigned)exam_prep_progress_total_solved(words));
+}
+
+uint16_t player_data_exam_prep_total_solved(WizardProfile_t profile) {
+    uint32_t words[3] = {};
+    exam_prep_load_words(profile, words);
+    return exam_prep_progress_total_solved(words);
+}
+
+uint8_t player_data_exam_prep_current_tier(WizardProfile_t profile) {
+    uint32_t words[3] = {};
+    exam_prep_load_words(profile, words);
+    return exam_prep_progress_current_tier(words);
+}
+
+uint8_t player_data_exam_prep_tier_solved(WizardProfile_t profile, uint8_t tier) {
+    uint32_t words[3] = {};
+    exam_prep_load_words(profile, words);
+    return exam_prep_progress_tier_solved(words, tier);
+}
 void player_data_reset_all(void) {
     nvs_handle_t handle;
     if (nvs_open(NVS_STORAGE_NAMESPACE, NVS_READWRITE, &handle) == ESP_OK) {

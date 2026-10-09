@@ -1,0 +1,2557 @@
+[
+  {
+    "id": 60000,
+    "tier": 1,
+    "operation": "fraction_times_whole",
+    "whole": 3,
+    "numerator": 1,
+    "denominator": 4,
+    "prompt": "חשב: 3 × 1/4",
+    "workPrompt1": "מהו שבר הביניים הנכון אחרי הכפל?",
+    "workOptions1": [
+      "4/4",
+      "3/4",
+      "3/5",
+      "7/4"
+    ],
+    "workCorrect1": 1,
+    "workPrompt2": null,
+    "workOptions2": [
+      "",
+      "",
+      "",
+      ""
+    ],
+    "workCorrect2": 0,
+    "options": [
+      "1/2",
+      "3/4",
+      "1 3/4",
+      "1 1/4"
+    ],
+    "correct": 1,
+    "hint": "אין צמצום מקדים: כפל את המספר השלם במונה והשאר את המכנה.",
+    "feedback": "דרך יעילה: צמצום אם אפשר, כפל, צמצום סופי והמרה. התוצאה: 3/4.",
+    "exact": "3/4",
+    "two_step_work": false
+  },
+  {
+    "id": 60001,
+    "tier": 1,
+    "operation": "fraction_times_whole",
+    "whole": 5,
+    "numerator": 2,
+    "denominator": 7,
+    "prompt": "חשב: 5 × 2/7",
+    "workPrompt1": "מהו שבר הביניים הנכון אחרי הכפל?",
+    "workOptions1": [
+      "10/7",
+      "7/7",
+      "10/8",
+      "17/7"
+    ],
+    "workCorrect1": 0,
+    "workPrompt2": null,
+    "workOptions2": [
+      "",
+      "",
+      "",
+      ""
+    ],
+    "workCorrect2": 0,
+    "options": [
+      "1 3/7",
+      "1 2/7",
+      "2 3/7",
+      "1 5/7"
+    ],
+    "correct": 0,
+    "hint": "אין צמצום מקדים: כפל את המספר השלם במונה והשאר את המכנה.",
+    "feedback": "דרך יעילה: צמצום אם אפשר, כפל, צמצום סופי והמרה. התוצאה: 1 3/7.",
+    "exact": "10/7",
+    "two_step_work": false
+  },
+  {
+    "id": 60002,
+    "tier": 1,
+    "operation": "fraction_times_whole",
+    "whole": 6,
+    "numerator": 3,
+    "denominator": 8,
+    "prompt": "חשב: 6 × 3/8",
+    "workPrompt1": "מהו הצמצום הנכון לפני הכפל?",
+    "workOptions1": [
+      "6 × 3/4",
+      "3 × 3/8",
+      "3 × 4/4",
+      "3 × 3/4"
+    ],
+    "workCorrect1": 3,
+    "workPrompt2": null,
+    "workOptions2": [
+      "",
+      "",
+      "",
+      ""
+    ],
+    "workCorrect2": 0,
+    "options": [
+      "2 1/8",
+      "3 1/4",
+      "2 1/2",
+      "2 1/4"
+    ],
+    "correct": 3,
+    "hint": "חפש גורם משותף בין המספר השלם למכנה לפני שמכפילים.",
+    "feedback": "דרך יעילה: צמצום אם אפשר, כפל, צמצום סופי והמרה. התוצאה: 2 1/4.",
+    "exact": "9/4",
+    "two_step_work": false
+  },
+  {
+    "id": 60003,
+    "tier": 1,
+    "operation": "fraction_times_whole",
+    "whole": 4,
+    "numerator": 5,
+    "denominator": 9,
+    "prompt": "חשב: 4 × 5/9",
+    "workPrompt1": "מהו שבר הביניים הנכון אחרי הכפל?",
+    "workOptions1": [
+      "9/9",
+      "20/10",
+      "20/9",
+      "29/9"
+    ],
+    "workCorrect1": 2,
+    "workPrompt2": null,
+    "workOptions2": [
+      "",
+      "",
+      "",
+      ""
+    ],
+    "workCorrect2": 0,
+    "options": [
+      "2 1/9",
+      "3 2/9",
+      "2 2/9",
+      "2 4/9"
+    ],
+    "correct": 2,
+    "hint": "אין צמצום מקדים: כפל את המספר השלם במונה והשאר את המכנה.",
+    "feedback": "דרך יעילה: צמצום אם אפשר, כפל, צמצום סופי והמרה. התוצאה: 2 2/9.",
+    "exact": "20/9",
+    "two_step_work": false
+  },
+  {
+    "id": 60004,
+    "tier": 1,
+    "operation": "fraction_times_whole",
+    "whole": 7,
+    "numerator": 2,
+    "denominator": 5,
+    "prompt": "חשב: 7 × 2/5",
+    "workPrompt1": "מהו שבר הביניים הנכון אחרי הכפל?",
+    "workOptions1": [
+      "9/5",
+      "14/5",
+      "14/6",
+      "19/5"
+    ],
+    "workCorrect1": 1,
+    "workPrompt2": null,
+    "workOptions2": [
+      "",
+      "",
+      "",
+      ""
+    ],
+    "workCorrect2": 0,
+    "options": [
+      "2 3/5",
+      "2 4/5",
+      "3 4/5",
+      "3 1/5"
+    ],
+    "correct": 1,
+    "hint": "אין צמצום מקדים: כפל את המספר השלם במונה והשאר את המכנה.",
+    "feedback": "דרך יעילה: צמצום אם אפשר, כפל, צמצום סופי והמרה. התוצאה: 2 4/5.",
+    "exact": "14/5",
+    "two_step_work": false
+  },
+  {
+    "id": 60005,
+    "tier": 1,
+    "operation": "mixed_times_whole",
+    "whole": 2,
+    "mixedWhole": 1,
+    "numerator": 1,
+    "denominator": 2,
+    "prompt": "חשב: 2 × 1 1/2",
+    "workPrompt1": "מהי ההמרה הנכונה של המספר המעורב לשבר מדומה?",
+    "workOptions1": [
+      "2 × 3/2",
+      "2 × 2/2",
+      "2 × 4/2",
+      "2 × 3/3"
+    ],
+    "workCorrect1": 0,
+    "workPrompt2": null,
+    "workOptions2": [
+      "",
+      "",
+      "",
+      ""
+    ],
+    "workCorrect2": 0,
+    "options": [
+      "3",
+      "2 1/2",
+      "4",
+      "3 2/3"
+    ],
+    "correct": 0,
+    "hint": "המר תחילה את המספר המעורב לשבר מדומה; אחר כך חפש צמצום עם המכנה.",
+    "feedback": "המרה: 1 1/2 = 3/2. לאחר צמצום וכפל התוצאה היא 3.",
+    "exact": "3/1",
+    "two_step_work": false
+  },
+  {
+    "id": 60006,
+    "tier": 1,
+    "operation": "mixed_times_whole",
+    "whole": 3,
+    "mixedWhole": 2,
+    "numerator": 1,
+    "denominator": 3,
+    "prompt": "חשב: 3 × 2 1/3",
+    "workPrompt1": "מהי ההמרה הנכונה של המספר המעורב לשבר מדומה?",
+    "workOptions1": [
+      "3 × 3/3",
+      "3 × 8/3",
+      "3 × 7/4",
+      "3 × 7/3"
+    ],
+    "workCorrect1": 3,
+    "workPrompt2": null,
+    "workOptions2": [
+      "",
+      "",
+      "",
+      ""
+    ],
+    "workCorrect2": 0,
+    "options": [
+      "6 2/3",
+      "8",
+      "7 2/3",
+      "7"
+    ],
+    "correct": 3,
+    "hint": "המר תחילה את המספר המעורב לשבר מדומה; אחר כך חפש צמצום עם המכנה.",
+    "feedback": "המרה: 2 1/3 = 7/3. לאחר צמצום וכפל התוצאה היא 7.",
+    "exact": "7/1",
+    "two_step_work": false
+  },
+  {
+    "id": 60007,
+    "tier": 1,
+    "operation": "mixed_times_whole",
+    "whole": 4,
+    "mixedWhole": 1,
+    "numerator": 3,
+    "denominator": 4,
+    "prompt": "חשב: 4 × 1 3/4",
+    "workPrompt1": "מהי ההמרה הנכונה של המספר המעורב לשבר מדומה?",
+    "workOptions1": [
+      "4 × 4/4",
+      "4 × 8/4",
+      "4 × 7/4",
+      "4 × 7/5"
+    ],
+    "workCorrect1": 2,
+    "workPrompt2": null,
+    "workOptions2": [
+      "",
+      "",
+      "",
+      ""
+    ],
+    "workCorrect2": 0,
+    "options": [
+      "6 3/4",
+      "8",
+      "7",
+      "7 1/2"
+    ],
+    "correct": 2,
+    "hint": "המר תחילה את המספר המעורב לשבר מדומה; אחר כך חפש צמצום עם המכנה.",
+    "feedback": "המרה: 1 3/4 = 7/4. לאחר צמצום וכפל התוצאה היא 7.",
+    "exact": "7/1",
+    "two_step_work": false
+  },
+  {
+    "id": 60008,
+    "tier": 1,
+    "operation": "mixed_times_whole",
+    "whole": 5,
+    "mixedWhole": 2,
+    "numerator": 2,
+    "denominator": 5,
+    "prompt": "חשב: 5 × 2 2/5",
+    "workPrompt1": "מהי ההמרה הנכונה של המספר המעורב לשבר מדומה?",
+    "workOptions1": [
+      "5 × 4/5",
+      "5 × 12/5",
+      "5 × 13/5",
+      "5 × 12/6"
+    ],
+    "workCorrect1": 1,
+    "workPrompt2": null,
+    "workOptions2": [
+      "",
+      "",
+      "",
+      ""
+    ],
+    "workCorrect2": 0,
+    "options": [
+      "11 4/5",
+      "12",
+      "13",
+      "12 2/5"
+    ],
+    "correct": 1,
+    "hint": "המר תחילה את המספר המעורב לשבר מדומה; אחר כך חפש צמצום עם המכנה.",
+    "feedback": "המרה: 2 2/5 = 12/5. לאחר צמצום וכפל התוצאה היא 12.",
+    "exact": "12/1",
+    "two_step_work": false
+  },
+  {
+    "id": 60009,
+    "tier": 1,
+    "operation": "mixed_times_whole",
+    "whole": 6,
+    "mixedWhole": 1,
+    "numerator": 5,
+    "denominator": 6,
+    "prompt": "חשב: 6 × 1 5/6",
+    "workPrompt1": "מהי ההמרה הנכונה של המספר המעורב לשבר מדומה?",
+    "workOptions1": [
+      "6 × 11/6",
+      "6 × 6/6",
+      "6 × 12/6",
+      "6 × 11/7"
+    ],
+    "workCorrect1": 0,
+    "workPrompt2": null,
+    "workOptions2": [
+      "",
+      "",
+      "",
+      ""
+    ],
+    "workCorrect2": 0,
+    "options": [
+      "11",
+      "10 5/6",
+      "12",
+      "11 1/3"
+    ],
+    "correct": 0,
+    "hint": "המר תחילה את המספר המעורב לשבר מדומה; אחר כך חפש צמצום עם המכנה.",
+    "feedback": "המרה: 1 5/6 = 11/6. לאחר צמצום וכפל התוצאה היא 11.",
+    "exact": "11/1",
+    "two_step_work": false
+  },
+  {
+    "id": 60010,
+    "tier": 2,
+    "operation": "fraction_times_whole",
+    "whole": 12,
+    "numerator": 5,
+    "denominator": 8,
+    "prompt": "חשב: 12 × 5/8",
+    "workPrompt1": "מהו הצמצום הנכון לפני הכפל?",
+    "workOptions1": [
+      "12 × 5/2",
+      "3 × 5/8",
+      "3 × 6/2",
+      "3 × 5/2"
+    ],
+    "workCorrect1": 3,
+    "workPrompt2": null,
+    "workOptions2": [
+      "",
+      "",
+      "",
+      ""
+    ],
+    "workCorrect2": 0,
+    "options": [
+      "7 3/8",
+      "8 1/2",
+      "7 3/4",
+      "7 1/2"
+    ],
+    "correct": 3,
+    "hint": "חפש גורם משותף בין המספר השלם למכנה לפני שמכפילים.",
+    "feedback": "דרך יעילה: צמצום אם אפשר, כפל, צמצום סופי והמרה. התוצאה: 7 1/2.",
+    "exact": "15/2",
+    "two_step_work": false
+  },
+  {
+    "id": 60011,
+    "tier": 2,
+    "operation": "fraction_times_whole",
+    "whole": 15,
+    "numerator": 7,
+    "denominator": 10,
+    "prompt": "חשב: 15 × 7/10",
+    "workPrompt1": "מהו הצמצום הנכון לפני הכפל?",
+    "workOptions1": [
+      "15 × 7/2",
+      "3 × 7/10",
+      "3 × 7/2",
+      "3 × 8/2"
+    ],
+    "workCorrect1": 2,
+    "workPrompt2": null,
+    "workOptions2": [
+      "",
+      "",
+      "",
+      ""
+    ],
+    "workCorrect2": 0,
+    "options": [
+      "10 2/5",
+      "11 1/2",
+      "10 1/2",
+      "10 7/10"
+    ],
+    "correct": 2,
+    "hint": "חפש גורם משותף בין המספר השלם למכנה לפני שמכפילים.",
+    "feedback": "דרך יעילה: צמצום אם אפשר, כפל, צמצום סופי והמרה. התוצאה: 10 1/2.",
+    "exact": "21/2",
+    "two_step_work": false
+  },
+  {
+    "id": 60012,
+    "tier": 2,
+    "operation": "fraction_times_whole",
+    "whole": 18,
+    "numerator": 5,
+    "denominator": 12,
+    "prompt": "חשב: 18 × 5/12",
+    "workPrompt1": "מהו הצמצום הנכון לפני הכפל?",
+    "workOptions1": [
+      "18 × 5/2",
+      "3 × 5/2",
+      "3 × 5/12",
+      "3 × 6/2"
+    ],
+    "workCorrect1": 1,
+    "workPrompt2": null,
+    "workOptions2": [
+      "",
+      "",
+      "",
+      ""
+    ],
+    "workCorrect2": 0,
+    "options": [
+      "7 5/12",
+      "7 1/2",
+      "8 1/2",
+      "7 2/3"
+    ],
+    "correct": 1,
+    "hint": "חפש גורם משותף בין המספר השלם למכנה לפני שמכפילים.",
+    "feedback": "דרך יעילה: צמצום אם אפשר, כפל, צמצום סופי והמרה. התוצאה: 7 1/2.",
+    "exact": "15/2",
+    "two_step_work": false
+  },
+  {
+    "id": 60013,
+    "tier": 2,
+    "operation": "fraction_times_whole",
+    "whole": 14,
+    "numerator": 9,
+    "denominator": 11,
+    "prompt": "חשב: 14 × 9/11",
+    "workPrompt1": "מהו שבר הביניים הנכון אחרי הכפל?",
+    "workOptions1": [
+      "126/11",
+      "23/11",
+      "126/12",
+      "137/11"
+    ],
+    "workCorrect1": 0,
+    "workPrompt2": null,
+    "workOptions2": [
+      "",
+      "",
+      "",
+      ""
+    ],
+    "workCorrect2": 0,
+    "options": [
+      "11 5/11",
+      "11 4/11",
+      "12 5/11",
+      "11 7/11"
+    ],
+    "correct": 0,
+    "hint": "אין צמצום מקדים: כפל את המספר השלם במונה והשאר את המכנה.",
+    "feedback": "דרך יעילה: צמצום אם אפשר, כפל, צמצום סופי והמרה. התוצאה: 11 5/11.",
+    "exact": "126/11",
+    "two_step_work": false
+  },
+  {
+    "id": 60014,
+    "tier": 2,
+    "operation": "fraction_times_whole",
+    "whole": 20,
+    "numerator": 7,
+    "denominator": 12,
+    "prompt": "חשב: 20 × 7/12",
+    "workPrompt1": "מהו הצמצום הנכון לפני הכפל?",
+    "workOptions1": [
+      "20 × 7/3",
+      "5 × 7/12",
+      "5 × 8/3",
+      "5 × 7/3"
+    ],
+    "workCorrect1": 3,
+    "workPrompt2": null,
+    "workOptions2": [
+      "",
+      "",
+      "",
+      ""
+    ],
+    "workCorrect2": 0,
+    "options": [
+      "11 7/12",
+      "12 2/3",
+      "11 5/6",
+      "11 2/3"
+    ],
+    "correct": 3,
+    "hint": "חפש גורם משותף בין המספר השלם למכנה לפני שמכפילים.",
+    "feedback": "דרך יעילה: צמצום אם אפשר, כפל, צמצום סופי והמרה. התוצאה: 11 2/3.",
+    "exact": "35/3",
+    "two_step_work": false
+  },
+  {
+    "id": 60015,
+    "tier": 2,
+    "operation": "mixed_times_whole",
+    "whole": 8,
+    "mixedWhole": 3,
+    "numerator": 3,
+    "denominator": 4,
+    "prompt": "חשב: 8 × 3 3/4",
+    "workPrompt1": "מהי ההמרה הנכונה של המספר המעורב לשבר מדומה?",
+    "workOptions1": [
+      "8 × 6/4",
+      "8 × 16/4",
+      "8 × 15/4",
+      "8 × 15/5"
+    ],
+    "workCorrect1": 2,
+    "workPrompt2": null,
+    "workOptions2": [
+      "",
+      "",
+      "",
+      ""
+    ],
+    "workCorrect2": 0,
+    "options": [
+      "29 3/4",
+      "31",
+      "30",
+      "30 1/2"
+    ],
+    "correct": 2,
+    "hint": "המר תחילה את המספר המעורב לשבר מדומה; אחר כך חפש צמצום עם המכנה.",
+    "feedback": "המרה: 3 3/4 = 15/4. לאחר צמצום וכפל התוצאה היא 30.",
+    "exact": "30/1",
+    "two_step_work": false
+  },
+  {
+    "id": 60016,
+    "tier": 2,
+    "operation": "mixed_times_whole",
+    "whole": 12,
+    "mixedWhole": 2,
+    "numerator": 5,
+    "denominator": 6,
+    "prompt": "חשב: 12 × 2 5/6",
+    "workPrompt1": "מהי ההמרה הנכונה של המספר המעורב לשבר מדומה?",
+    "workOptions1": [
+      "12 × 7/6",
+      "12 × 17/6",
+      "12 × 18/6",
+      "12 × 17/7"
+    ],
+    "workCorrect1": 1,
+    "workPrompt2": null,
+    "workOptions2": [
+      "",
+      "",
+      "",
+      ""
+    ],
+    "workCorrect2": 0,
+    "options": [
+      "33 5/6",
+      "34",
+      "35",
+      "34 1/3"
+    ],
+    "correct": 1,
+    "hint": "המר תחילה את המספר המעורב לשבר מדומה; אחר כך חפש צמצום עם המכנה.",
+    "feedback": "המרה: 2 5/6 = 17/6. לאחר צמצום וכפל התוצאה היא 34.",
+    "exact": "34/1",
+    "two_step_work": false
+  },
+  {
+    "id": 60017,
+    "tier": 2,
+    "operation": "mixed_times_whole",
+    "whole": 15,
+    "mixedWhole": 4,
+    "numerator": 7,
+    "denominator": 10,
+    "prompt": "חשב: 15 × 4 7/10",
+    "workPrompt1": "מהי ההמרה הנכונה של המספר המעורב לשבר מדומה?",
+    "workOptions1": [
+      "15 × 47/10",
+      "15 × 11/10",
+      "15 × 48/10",
+      "15 × 47/11"
+    ],
+    "workCorrect1": 0,
+    "workPrompt2": null,
+    "workOptions2": [
+      "",
+      "",
+      "",
+      ""
+    ],
+    "workCorrect2": 0,
+    "options": [
+      "70 1/2",
+      "70 2/5",
+      "71 1/2",
+      "70 7/10"
+    ],
+    "correct": 0,
+    "hint": "המר תחילה את המספר המעורב לשבר מדומה; אחר כך חפש צמצום עם המכנה.",
+    "feedback": "המרה: 4 7/10 = 47/10. לאחר צמצום וכפל התוצאה היא 70 1/2.",
+    "exact": "141/2",
+    "two_step_work": false
+  },
+  {
+    "id": 60018,
+    "tier": 2,
+    "operation": "mixed_times_whole",
+    "whole": 18,
+    "mixedWhole": 3,
+    "numerator": 5,
+    "denominator": 12,
+    "prompt": "חשב: 18 × 3 5/12",
+    "workPrompt1": "מהי ההמרה הנכונה של המספר המעורב לשבר מדומה?",
+    "workOptions1": [
+      "18 × 8/12",
+      "18 × 42/12",
+      "18 × 41/13",
+      "18 × 41/12"
+    ],
+    "workCorrect1": 3,
+    "workPrompt2": null,
+    "workOptions2": [
+      "",
+      "",
+      "",
+      ""
+    ],
+    "workCorrect2": 0,
+    "options": [
+      "61 5/12",
+      "62 1/2",
+      "61 2/3",
+      "61 1/2"
+    ],
+    "correct": 3,
+    "hint": "המר תחילה את המספר המעורב לשבר מדומה; אחר כך חפש צמצום עם המכנה.",
+    "feedback": "המרה: 3 5/12 = 41/12. לאחר צמצום וכפל התוצאה היא 61 1/2.",
+    "exact": "123/2",
+    "two_step_work": false
+  },
+  {
+    "id": 60019,
+    "tier": 2,
+    "operation": "mixed_times_whole",
+    "whole": 20,
+    "mixedWhole": 5,
+    "numerator": 7,
+    "denominator": 8,
+    "prompt": "חשב: 20 × 5 7/8",
+    "workPrompt1": "מהי ההמרה הנכונה של המספר המעורב לשבר מדומה?",
+    "workOptions1": [
+      "20 × 12/8",
+      "20 × 48/8",
+      "20 × 47/8",
+      "20 × 47/9"
+    ],
+    "workCorrect1": 2,
+    "workPrompt2": null,
+    "workOptions2": [
+      "",
+      "",
+      "",
+      ""
+    ],
+    "workCorrect2": 0,
+    "options": [
+      "117 3/8",
+      "118 1/2",
+      "117 1/2",
+      "117 3/4"
+    ],
+    "correct": 2,
+    "hint": "המר תחילה את המספר המעורב לשבר מדומה; אחר כך חפש צמצום עם המכנה.",
+    "feedback": "המרה: 5 7/8 = 47/8. לאחר צמצום וכפל התוצאה היא 117 1/2.",
+    "exact": "235/2",
+    "two_step_work": false
+  },
+  {
+    "id": 60020,
+    "tier": 3,
+    "operation": "fraction_times_whole",
+    "whole": 24,
+    "numerator": 7,
+    "denominator": 12,
+    "prompt": "חשב: 24 × 7/12",
+    "workPrompt1": "מהו הצמצום הנכון לפני הכפל?",
+    "workOptions1": [
+      "24 × 7/1",
+      "2 × 7/1",
+      "2 × 7/12",
+      "2 × 8/1"
+    ],
+    "workCorrect1": 1,
+    "workPrompt2": null,
+    "workOptions2": [
+      "",
+      "",
+      "",
+      ""
+    ],
+    "workCorrect2": 0,
+    "options": [
+      "13 11/12",
+      "14",
+      "15",
+      "14 1/6"
+    ],
+    "correct": 1,
+    "hint": "חפש גורם משותף בין המספר השלם למכנה לפני שמכפילים.",
+    "feedback": "דרך יעילה: צמצום אם אפשר, כפל, צמצום סופי והמרה. התוצאה: 14.",
+    "exact": "14/1",
+    "two_step_work": false
+  },
+  {
+    "id": 60021,
+    "tier": 3,
+    "operation": "fraction_times_whole",
+    "whole": 28,
+    "numerator": 9,
+    "denominator": 14,
+    "prompt": "חשב: 28 × 9/14",
+    "workPrompt1": "מהו הצמצום הנכון לפני הכפל?",
+    "workOptions1": [
+      "2 × 9/1",
+      "28 × 9/1",
+      "2 × 9/14",
+      "2 × 10/1"
+    ],
+    "workCorrect1": 0,
+    "workPrompt2": null,
+    "workOptions2": [
+      "",
+      "",
+      "",
+      ""
+    ],
+    "workCorrect2": 0,
+    "options": [
+      "18",
+      "17 13/14",
+      "19",
+      "18 1/7"
+    ],
+    "correct": 0,
+    "hint": "חפש גורם משותף בין המספר השלם למכנה לפני שמכפילים.",
+    "feedback": "דרך יעילה: צמצום אם אפשר, כפל, צמצום סופי והמרה. התוצאה: 18.",
+    "exact": "18/1",
+    "two_step_work": false
+  },
+  {
+    "id": 60022,
+    "tier": 3,
+    "operation": "fraction_times_whole",
+    "whole": 30,
+    "numerator": 11,
+    "denominator": 15,
+    "prompt": "חשב: 30 × 11/15",
+    "workPrompt1": "מהו הצמצום הנכון לפני הכפל?",
+    "workOptions1": [
+      "30 × 11/1",
+      "2 × 11/15",
+      "2 × 12/1",
+      "2 × 11/1"
+    ],
+    "workCorrect1": 3,
+    "workPrompt2": null,
+    "workOptions2": [
+      "",
+      "",
+      "",
+      ""
+    ],
+    "workCorrect2": 0,
+    "options": [
+      "21 14/15",
+      "23",
+      "22 2/15",
+      "22"
+    ],
+    "correct": 3,
+    "hint": "חפש גורם משותף בין המספר השלם למכנה לפני שמכפילים.",
+    "feedback": "דרך יעילה: צמצום אם אפשר, כפל, צמצום סופי והמרה. התוצאה: 22.",
+    "exact": "22/1",
+    "two_step_work": false
+  },
+  {
+    "id": 60023,
+    "tier": 3,
+    "operation": "fraction_times_whole",
+    "whole": 27,
+    "numerator": 10,
+    "denominator": 12,
+    "prompt": "חשב: 27 × 10/12",
+    "workPrompt1": "מהו הצמצום הנכון לפני הכפל?",
+    "workOptions1": [
+      "27 × 10/4",
+      "9 × 10/12",
+      "9 × 10/4",
+      "9 × 11/4"
+    ],
+    "workCorrect1": 2,
+    "workPrompt2": null,
+    "workOptions2": [
+      "",
+      "",
+      "",
+      ""
+    ],
+    "workCorrect2": 0,
+    "options": [
+      "22 5/12",
+      "23 1/2",
+      "22 1/2",
+      "22 2/3"
+    ],
+    "correct": 2,
+    "hint": "חפש גורם משותף בין המספר השלם למכנה לפני שמכפילים.",
+    "feedback": "דרך יעילה: צמצום אם אפשר, כפל, צמצום סופי והמרה. התוצאה: 22 1/2.",
+    "exact": "45/2",
+    "two_step_work": false
+  },
+  {
+    "id": 60024,
+    "tier": 3,
+    "operation": "fraction_times_whole",
+    "whole": 25,
+    "numerator": 14,
+    "denominator": 15,
+    "prompt": "חשב: 25 × 14/15",
+    "workPrompt1": "מהו הצמצום הנכון לפני הכפל?",
+    "workOptions1": [
+      "25 × 14/3",
+      "5 × 14/3",
+      "5 × 14/15",
+      "5 × 15/3"
+    ],
+    "workCorrect1": 1,
+    "workPrompt2": null,
+    "workOptions2": [
+      "",
+      "",
+      "",
+      ""
+    ],
+    "workCorrect2": 0,
+    "options": [
+      "23 4/15",
+      "23 1/3",
+      "24 1/3",
+      "23 7/15"
+    ],
+    "correct": 1,
+    "hint": "חפש גורם משותף בין המספר השלם למכנה לפני שמכפילים.",
+    "feedback": "דרך יעילה: צמצום אם אפשר, כפל, צמצום סופי והמרה. התוצאה: 23 1/3.",
+    "exact": "70/3",
+    "two_step_work": false
+  },
+  {
+    "id": 60025,
+    "tier": 3,
+    "operation": "mixed_times_whole",
+    "whole": 24,
+    "mixedWhole": 4,
+    "numerator": 5,
+    "denominator": 12,
+    "prompt": "חשב: 24 × 4 5/12",
+    "workPrompt1": "מהי ההמרה הנכונה של המספר המעורב לשבר מדומה?",
+    "workOptions1": [
+      "24 × 53/12",
+      "24 × 9/12",
+      "24 × 54/12",
+      "24 × 53/13"
+    ],
+    "workCorrect1": 0,
+    "workPrompt2": null,
+    "workOptions2": [
+      "",
+      "",
+      "",
+      ""
+    ],
+    "workCorrect2": 0,
+    "options": [
+      "106",
+      "105 11/12",
+      "107",
+      "106 1/6"
+    ],
+    "correct": 0,
+    "hint": "המר תחילה את המספר המעורב לשבר מדומה; אחר כך חפש צמצום עם המכנה.",
+    "feedback": "המרה: 4 5/12 = 53/12. לאחר צמצום וכפל התוצאה היא 106.",
+    "exact": "106/1",
+    "two_step_work": false
+  },
+  {
+    "id": 60026,
+    "tier": 3,
+    "operation": "mixed_times_whole",
+    "whole": 28,
+    "mixedWhole": 6,
+    "numerator": 9,
+    "denominator": 14,
+    "prompt": "חשב: 28 × 6 9/14",
+    "workPrompt1": "מהי ההמרה הנכונה של המספר המעורב לשבר מדומה?",
+    "workOptions1": [
+      "28 × 15/14",
+      "28 × 94/14",
+      "28 × 93/15",
+      "28 × 93/14"
+    ],
+    "workCorrect1": 3,
+    "workPrompt2": null,
+    "workOptions2": [
+      "",
+      "",
+      "",
+      ""
+    ],
+    "workCorrect2": 0,
+    "options": [
+      "185 13/14",
+      "187",
+      "186 1/7",
+      "186"
+    ],
+    "correct": 3,
+    "hint": "המר תחילה את המספר המעורב לשבר מדומה; אחר כך חפש צמצום עם המכנה.",
+    "feedback": "המרה: 6 9/14 = 93/14. לאחר צמצום וכפל התוצאה היא 186.",
+    "exact": "186/1",
+    "two_step_work": false
+  },
+  {
+    "id": 60027,
+    "tier": 3,
+    "operation": "mixed_times_whole",
+    "whole": 30,
+    "mixedWhole": 5,
+    "numerator": 11,
+    "denominator": 15,
+    "prompt": "חשב: 30 × 5 11/15",
+    "workPrompt1": "מהי ההמרה הנכונה של המספר המעורב לשבר מדומה?",
+    "workOptions1": [
+      "30 × 16/15",
+      "30 × 87/15",
+      "30 × 86/15",
+      "30 × 86/16"
+    ],
+    "workCorrect1": 2,
+    "workPrompt2": null,
+    "workOptions2": [
+      "",
+      "",
+      "",
+      ""
+    ],
+    "workCorrect2": 0,
+    "options": [
+      "171 14/15",
+      "173",
+      "172",
+      "172 2/15"
+    ],
+    "correct": 2,
+    "hint": "המר תחילה את המספר המעורב לשבר מדומה; אחר כך חפש צמצום עם המכנה.",
+    "feedback": "המרה: 5 11/15 = 86/15. לאחר צמצום וכפל התוצאה היא 172.",
+    "exact": "172/1",
+    "two_step_work": false
+  },
+  {
+    "id": 60028,
+    "tier": 3,
+    "operation": "mixed_times_whole",
+    "whole": 27,
+    "mixedWhole": 7,
+    "numerator": 8,
+    "denominator": 9,
+    "prompt": "חשב: 27 × 7 8/9",
+    "workPrompt1": "מהי ההמרה הנכונה של המספר המעורב לשבר מדומה?",
+    "workOptions1": [
+      "27 × 15/9",
+      "27 × 71/9",
+      "27 × 72/9",
+      "27 × 71/10"
+    ],
+    "workCorrect1": 1,
+    "workPrompt2": null,
+    "workOptions2": [
+      "",
+      "",
+      "",
+      ""
+    ],
+    "workCorrect2": 0,
+    "options": [
+      "212 8/9",
+      "213",
+      "214",
+      "213 2/9"
+    ],
+    "correct": 1,
+    "hint": "המר תחילה את המספר המעורב לשבר מדומה; אחר כך חפש צמצום עם המכנה.",
+    "feedback": "המרה: 7 8/9 = 71/9. לאחר צמצום וכפל התוצאה היא 213.",
+    "exact": "213/1",
+    "two_step_work": false
+  },
+  {
+    "id": 60029,
+    "tier": 3,
+    "operation": "mixed_times_whole",
+    "whole": 25,
+    "mixedWhole": 8,
+    "numerator": 14,
+    "denominator": 15,
+    "prompt": "חשב: 25 × 8 14/15",
+    "workPrompt1": "מהי ההמרה הנכונה של המספר המעורב לשבר מדומה?",
+    "workOptions1": [
+      "25 × 134/15",
+      "25 × 22/15",
+      "25 × 135/15",
+      "25 × 134/16"
+    ],
+    "workCorrect1": 0,
+    "workPrompt2": null,
+    "workOptions2": [
+      "",
+      "",
+      "",
+      ""
+    ],
+    "workCorrect2": 0,
+    "options": [
+      "223 1/3",
+      "223 4/15",
+      "224 1/3",
+      "223 7/15"
+    ],
+    "correct": 0,
+    "hint": "המר תחילה את המספר המעורב לשבר מדומה; אחר כך חפש צמצום עם המכנה.",
+    "feedback": "המרה: 8 14/15 = 134/15. לאחר צמצום וכפל התוצאה היא 223 1/3.",
+    "exact": "670/3",
+    "two_step_work": false
+  },
+  {
+    "id": 60030,
+    "tier": 4,
+    "operation": "fraction_times_whole",
+    "whole": 36,
+    "numerator": 11,
+    "denominator": 18,
+    "prompt": "חשב: 36 × 11/18",
+    "workPrompt1": "מהו הצמצום הנכון לפני הכפל?",
+    "workOptions1": [
+      "36 × 11/1",
+      "2 × 11/18",
+      "2 × 12/1",
+      "2 × 11/1"
+    ],
+    "workCorrect1": 3,
+    "workPrompt2": "אחרי הצמצום, מהו שבר המכפלה לפני המרה למספר מעורב?",
+    "workOptions2": [
+      "23/1",
+      "13/1",
+      "22/1",
+      "22/2"
+    ],
+    "workCorrect2": 2,
+    "options": [
+      "21 17/18",
+      "23",
+      "22 1/9",
+      "22"
+    ],
+    "correct": 3,
+    "hint": "חפש גורם משותף בין המספר השלם למכנה לפני שמכפילים.",
+    "feedback": "דרך יעילה: צמצום אם אפשר, כפל, צמצום סופי והמרה. התוצאה: 22.",
+    "exact": "22/1",
+    "two_step_work": true
+  },
+  {
+    "id": 60031,
+    "tier": 4,
+    "operation": "fraction_times_whole",
+    "whole": 42,
+    "numerator": 13,
+    "denominator": 14,
+    "prompt": "חשב: 42 × 13/14",
+    "workPrompt1": "מהו הצמצום הנכון לפני הכפל?",
+    "workOptions1": [
+      "42 × 13/1",
+      "3 × 13/14",
+      "3 × 13/1",
+      "3 × 14/1"
+    ],
+    "workCorrect1": 2,
+    "workPrompt2": "אחרי הצמצום, מהו שבר המכפלה לפני המרה למספר מעורב?",
+    "workOptions2": [
+      "40/1",
+      "16/1",
+      "39/1",
+      "39/2"
+    ],
+    "workCorrect2": 2,
+    "options": [
+      "38 13/14",
+      "40",
+      "39",
+      "39 1/7"
+    ],
+    "correct": 2,
+    "hint": "חפש גורם משותף בין המספר השלם למכנה לפני שמכפילים.",
+    "feedback": "דרך יעילה: צמצום אם אפשר, כפל, צמצום סופי והמרה. התוצאה: 39.",
+    "exact": "39/1",
+    "two_step_work": true
+  },
+  {
+    "id": 60032,
+    "tier": 4,
+    "operation": "fraction_times_whole",
+    "whole": 45,
+    "numerator": 17,
+    "denominator": 20,
+    "prompt": "חשב: 45 × 17/20",
+    "workPrompt1": "מהו הצמצום הנכון לפני הכפל?",
+    "workOptions1": [
+      "45 × 17/4",
+      "9 × 17/4",
+      "9 × 17/20",
+      "9 × 18/4"
+    ],
+    "workCorrect1": 1,
+    "workPrompt2": "אחרי הצמצום, מהו שבר המכפלה לפני המרה למספר מעורב?",
+    "workOptions2": [
+      "154/4",
+      "26/4",
+      "153/4",
+      "153/5"
+    ],
+    "workCorrect2": 2,
+    "options": [
+      "38 1/5",
+      "38 1/4",
+      "39 1/4",
+      "38 7/20"
+    ],
+    "correct": 1,
+    "hint": "חפש גורם משותף בין המספר השלם למכנה לפני שמכפילים.",
+    "feedback": "דרך יעילה: צמצום אם אפשר, כפל, צמצום סופי והמרה. התוצאה: 38 1/4.",
+    "exact": "153/4",
+    "two_step_work": true
+  },
+  {
+    "id": 60033,
+    "tier": 4,
+    "operation": "fraction_times_whole",
+    "whole": 48,
+    "numerator": 7,
+    "denominator": 16,
+    "prompt": "חשב: 48 × 7/16",
+    "workPrompt1": "מהו הצמצום הנכון לפני הכפל?",
+    "workOptions1": [
+      "3 × 7/1",
+      "48 × 7/1",
+      "3 × 7/16",
+      "3 × 8/1"
+    ],
+    "workCorrect1": 0,
+    "workPrompt2": "אחרי הצמצום, מהו שבר המכפלה לפני המרה למספר מעורב?",
+    "workOptions2": [
+      "22/1",
+      "10/1",
+      "21/1",
+      "21/2"
+    ],
+    "workCorrect2": 2,
+    "options": [
+      "21",
+      "20 15/16",
+      "22",
+      "21 1/8"
+    ],
+    "correct": 0,
+    "hint": "חפש גורם משותף בין המספר השלם למכנה לפני שמכפילים.",
+    "feedback": "דרך יעילה: צמצום אם אפשר, כפל, צמצום סופי והמרה. התוצאה: 21.",
+    "exact": "21/1",
+    "two_step_work": true
+  },
+  {
+    "id": 60034,
+    "tier": 4,
+    "operation": "fraction_times_whole",
+    "whole": 50,
+    "numerator": 19,
+    "denominator": 20,
+    "prompt": "חשב: 50 × 19/20",
+    "workPrompt1": "מהו הצמצום הנכון לפני הכפל?",
+    "workOptions1": [
+      "50 × 19/2",
+      "5 × 19/20",
+      "5 × 20/2",
+      "5 × 19/2"
+    ],
+    "workCorrect1": 3,
+    "workPrompt2": "אחרי הצמצום, מהו שבר המכפלה לפני המרה למספר מעורב?",
+    "workOptions2": [
+      "96/2",
+      "24/2",
+      "95/2",
+      "95/3"
+    ],
+    "workCorrect2": 2,
+    "options": [
+      "47 9/20",
+      "48 1/2",
+      "47 3/5",
+      "47 1/2"
+    ],
+    "correct": 3,
+    "hint": "חפש גורם משותף בין המספר השלם למכנה לפני שמכפילים.",
+    "feedback": "דרך יעילה: צמצום אם אפשר, כפל, צמצום סופי והמרה. התוצאה: 47 1/2.",
+    "exact": "95/2",
+    "two_step_work": true
+  },
+  {
+    "id": 60035,
+    "tier": 4,
+    "operation": "mixed_times_whole",
+    "whole": 36,
+    "mixedWhole": 8,
+    "numerator": 7,
+    "denominator": 18,
+    "prompt": "חשב: 36 × 8 7/18",
+    "workPrompt1": "מהי ההמרה הנכונה של המספר המעורב לשבר מדומה?",
+    "workOptions1": [
+      "36 × 15/18",
+      "36 × 152/18",
+      "36 × 151/18",
+      "36 × 151/19"
+    ],
+    "workCorrect1": 2,
+    "workPrompt2": "לאחר ההמרה, איזה צמצום נכון לבצע לפני הכפל?",
+    "workOptions2": [
+      "36 × 151/1",
+      "2 × 151/18",
+      "2 × 151/1",
+      "1 × 151/1"
+    ],
+    "workCorrect2": 2,
+    "options": [
+      "301 17/18",
+      "303",
+      "302",
+      "302 1/9"
+    ],
+    "correct": 2,
+    "hint": "המר תחילה את המספר המעורב לשבר מדומה; אחר כך חפש צמצום עם המכנה.",
+    "feedback": "המרה: 8 7/18 = 151/18. לאחר צמצום וכפל התוצאה היא 302.",
+    "exact": "302/1",
+    "two_step_work": true
+  },
+  {
+    "id": 60036,
+    "tier": 4,
+    "operation": "mixed_times_whole",
+    "whole": 42,
+    "mixedWhole": 9,
+    "numerator": 11,
+    "denominator": 14,
+    "prompt": "חשב: 42 × 9 11/14",
+    "workPrompt1": "מהי ההמרה הנכונה של המספר המעורב לשבר מדומה?",
+    "workOptions1": [
+      "42 × 20/14",
+      "42 × 137/14",
+      "42 × 138/14",
+      "42 × 137/15"
+    ],
+    "workCorrect1": 1,
+    "workPrompt2": "לאחר ההמרה, איזה צמצום נכון לבצע לפני הכפל?",
+    "workOptions2": [
+      "42 × 137/1",
+      "3 × 137/14",
+      "3 × 137/1",
+      "2 × 137/1"
+    ],
+    "workCorrect2": 2,
+    "options": [
+      "410 13/14",
+      "411",
+      "412",
+      "411 1/7"
+    ],
+    "correct": 1,
+    "hint": "המר תחילה את המספר המעורב לשבר מדומה; אחר כך חפש צמצום עם המכנה.",
+    "feedback": "המרה: 9 11/14 = 137/14. לאחר צמצום וכפל התוצאה היא 411.",
+    "exact": "411/1",
+    "two_step_work": true
+  },
+  {
+    "id": 60037,
+    "tier": 4,
+    "operation": "mixed_times_whole",
+    "whole": 45,
+    "mixedWhole": 7,
+    "numerator": 13,
+    "denominator": 20,
+    "prompt": "חשב: 45 × 7 13/20",
+    "workPrompt1": "מהי ההמרה הנכונה של המספר המעורב לשבר מדומה?",
+    "workOptions1": [
+      "45 × 153/20",
+      "45 × 20/20",
+      "45 × 154/20",
+      "45 × 153/21"
+    ],
+    "workCorrect1": 0,
+    "workPrompt2": "לאחר ההמרה, איזה צמצום נכון לבצע לפני הכפל?",
+    "workOptions2": [
+      "45 × 153/4",
+      "9 × 153/20",
+      "9 × 153/4",
+      "8 × 153/4"
+    ],
+    "workCorrect2": 2,
+    "options": [
+      "344 1/4",
+      "344 1/5",
+      "345 1/4",
+      "344 7/20"
+    ],
+    "correct": 0,
+    "hint": "המר תחילה את המספר המעורב לשבר מדומה; אחר כך חפש צמצום עם המכנה.",
+    "feedback": "המרה: 7 13/20 = 153/20. לאחר צמצום וכפל התוצאה היא 344 1/4.",
+    "exact": "1377/4",
+    "two_step_work": true
+  },
+  {
+    "id": 60038,
+    "tier": 4,
+    "operation": "mixed_times_whole",
+    "whole": 48,
+    "mixedWhole": 10,
+    "numerator": 5,
+    "denominator": 16,
+    "prompt": "חשב: 48 × 10 5/16",
+    "workPrompt1": "מהי ההמרה הנכונה של המספר המעורב לשבר מדומה?",
+    "workOptions1": [
+      "48 × 15/16",
+      "48 × 166/16",
+      "48 × 165/17",
+      "48 × 165/16"
+    ],
+    "workCorrect1": 3,
+    "workPrompt2": "לאחר ההמרה, איזה צמצום נכון לבצע לפני הכפל?",
+    "workOptions2": [
+      "48 × 165/1",
+      "3 × 165/16",
+      "3 × 165/1",
+      "2 × 165/1"
+    ],
+    "workCorrect2": 2,
+    "options": [
+      "494 15/16",
+      "496",
+      "495 1/8",
+      "495"
+    ],
+    "correct": 3,
+    "hint": "המר תחילה את המספר המעורב לשבר מדומה; אחר כך חפש צמצום עם המכנה.",
+    "feedback": "המרה: 10 5/16 = 165/16. לאחר צמצום וכפל התוצאה היא 495.",
+    "exact": "495/1",
+    "two_step_work": true
+  },
+  {
+    "id": 60039,
+    "tier": 4,
+    "operation": "mixed_times_whole",
+    "whole": 50,
+    "mixedWhole": 11,
+    "numerator": 17,
+    "denominator": 20,
+    "prompt": "חשב: 50 × 11 17/20",
+    "workPrompt1": "מהי ההמרה הנכונה של המספר המעורב לשבר מדומה?",
+    "workOptions1": [
+      "50 × 28/20",
+      "50 × 238/20",
+      "50 × 237/20",
+      "50 × 237/21"
+    ],
+    "workCorrect1": 2,
+    "workPrompt2": "לאחר ההמרה, איזה צמצום נכון לבצע לפני הכפל?",
+    "workOptions2": [
+      "50 × 237/2",
+      "5 × 237/20",
+      "5 × 237/2",
+      "4 × 237/2"
+    ],
+    "workCorrect2": 2,
+    "options": [
+      "592 9/20",
+      "593 1/2",
+      "592 1/2",
+      "592 3/5"
+    ],
+    "correct": 2,
+    "hint": "המר תחילה את המספר המעורב לשבר מדומה; אחר כך חפש צמצום עם המכנה.",
+    "feedback": "המרה: 11 17/20 = 237/20. לאחר צמצום וכפל התוצאה היא 592 1/2.",
+    "exact": "1185/2",
+    "two_step_work": true
+  },
+  {
+    "id": 60040,
+    "tier": 5,
+    "operation": "fraction_times_whole",
+    "whole": 60,
+    "numerator": 17,
+    "denominator": 24,
+    "prompt": "חשב: 60 × 17/24",
+    "workPrompt1": "מהו הצמצום הנכון לפני הכפל?",
+    "workOptions1": [
+      "60 × 17/2",
+      "5 × 17/2",
+      "5 × 17/24",
+      "5 × 18/2"
+    ],
+    "workCorrect1": 1,
+    "workPrompt2": "אחרי הצמצום, מהו שבר המכפלה לפני המרה למספר מעורב?",
+    "workOptions2": [
+      "86/2",
+      "22/2",
+      "85/2",
+      "85/3"
+    ],
+    "workCorrect2": 2,
+    "options": [
+      "42 11/24",
+      "42 1/2",
+      "43 1/2",
+      "42 7/12"
+    ],
+    "correct": 1,
+    "hint": "חפש גורם משותף בין המספר השלם למכנה לפני שמכפילים.",
+    "feedback": "דרך יעילה: צמצום אם אפשר, כפל, צמצום סופי והמרה. התוצאה: 42 1/2.",
+    "exact": "85/2",
+    "two_step_work": true
+  },
+  {
+    "id": 60041,
+    "tier": 5,
+    "operation": "fraction_times_whole",
+    "whole": 72,
+    "numerator": 19,
+    "denominator": 30,
+    "prompt": "חשב: 72 × 19/30",
+    "workPrompt1": "מהו הצמצום הנכון לפני הכפל?",
+    "workOptions1": [
+      "12 × 19/5",
+      "72 × 19/5",
+      "12 × 19/30",
+      "12 × 20/5"
+    ],
+    "workCorrect1": 0,
+    "workPrompt2": "אחרי הצמצום, מהו שבר המכפלה לפני המרה למספר מעורב?",
+    "workOptions2": [
+      "229/5",
+      "31/5",
+      "228/5",
+      "228/6"
+    ],
+    "workCorrect2": 2,
+    "options": [
+      "45 3/5",
+      "45 17/30",
+      "46 3/5",
+      "45 2/3"
+    ],
+    "correct": 0,
+    "hint": "חפש גורם משותף בין המספר השלם למכנה לפני שמכפילים.",
+    "feedback": "דרך יעילה: צמצום אם אפשר, כפל, צמצום סופי והמרה. התוצאה: 45 3/5.",
+    "exact": "228/5",
+    "two_step_work": true
+  },
+  {
+    "id": 60042,
+    "tier": 5,
+    "operation": "fraction_times_whole",
+    "whole": 75,
+    "numerator": 23,
+    "denominator": 25,
+    "prompt": "חשב: 75 × 23/25",
+    "workPrompt1": "מהו הצמצום הנכון לפני הכפל?",
+    "workOptions1": [
+      "75 × 23/1",
+      "3 × 23/25",
+      "3 × 24/1",
+      "3 × 23/1"
+    ],
+    "workCorrect1": 3,
+    "workPrompt2": "אחרי הצמצום, מהו שבר המכפלה לפני המרה למספר מעורב?",
+    "workOptions2": [
+      "70/1",
+      "26/1",
+      "69/1",
+      "69/2"
+    ],
+    "workCorrect2": 2,
+    "options": [
+      "68 24/25",
+      "70",
+      "69 2/25",
+      "69"
+    ],
+    "correct": 3,
+    "hint": "חפש גורם משותף בין המספר השלם למכנה לפני שמכפילים.",
+    "feedback": "דרך יעילה: צמצום אם אפשר, כפל, צמצום סופי והמרה. התוצאה: 69.",
+    "exact": "69/1",
+    "two_step_work": true
+  },
+  {
+    "id": 60043,
+    "tier": 5,
+    "operation": "fraction_times_whole",
+    "whole": 64,
+    "numerator": 21,
+    "denominator": 28,
+    "prompt": "חשב: 64 × 21/28",
+    "workPrompt1": "מהו הצמצום הנכון לפני הכפל?",
+    "workOptions1": [
+      "64 × 21/7",
+      "16 × 21/28",
+      "16 × 21/7",
+      "16 × 22/7"
+    ],
+    "workCorrect1": 2,
+    "workPrompt2": "אחרי הצמצום, מהו שבר המכפלה לפני המרה למספר מעורב?",
+    "workOptions2": [
+      "337/7",
+      "37/7",
+      "336/7",
+      "336/8"
+    ],
+    "workCorrect2": 2,
+    "options": [
+      "47 27/28",
+      "49",
+      "48",
+      "48 1/14"
+    ],
+    "correct": 2,
+    "hint": "חפש גורם משותף בין המספר השלם למכנה לפני שמכפילים.",
+    "feedback": "דרך יעילה: צמצום אם אפשר, כפל, צמצום סופי והמרה. התוצאה: 48.",
+    "exact": "48/1",
+    "two_step_work": true
+  },
+  {
+    "id": 60044,
+    "tier": 5,
+    "operation": "fraction_times_whole",
+    "whole": 80,
+    "numerator": 29,
+    "denominator": 30,
+    "prompt": "חשב: 80 × 29/30",
+    "workPrompt1": "מהו הצמצום הנכון לפני הכפל?",
+    "workOptions1": [
+      "80 × 29/3",
+      "8 × 29/3",
+      "8 × 29/30",
+      "8 × 30/3"
+    ],
+    "workCorrect1": 1,
+    "workPrompt2": "אחרי הצמצום, מהו שבר המכפלה לפני המרה למספר מעורב?",
+    "workOptions2": [
+      "233/3",
+      "37/3",
+      "232/3",
+      "232/4"
+    ],
+    "workCorrect2": 2,
+    "options": [
+      "77 3/10",
+      "77 1/3",
+      "78 1/3",
+      "77 2/5"
+    ],
+    "correct": 1,
+    "hint": "חפש גורם משותף בין המספר השלם למכנה לפני שמכפילים.",
+    "feedback": "דרך יעילה: צמצום אם אפשר, כפל, צמצום סופי והמרה. התוצאה: 77 1/3.",
+    "exact": "232/3",
+    "two_step_work": true
+  },
+  {
+    "id": 60045,
+    "tier": 5,
+    "operation": "mixed_times_whole",
+    "whole": 48,
+    "mixedWhole": 12,
+    "numerator": 7,
+    "denominator": 18,
+    "prompt": "חשב: 48 × 12 7/18",
+    "workPrompt1": "מהי ההמרה הנכונה של המספר המעורב לשבר מדומה?",
+    "workOptions1": [
+      "48 × 223/18",
+      "48 × 19/18",
+      "48 × 224/18",
+      "48 × 223/19"
+    ],
+    "workCorrect1": 0,
+    "workPrompt2": "לאחר ההמרה, איזה צמצום נכון לבצע לפני הכפל?",
+    "workOptions2": [
+      "48 × 223/3",
+      "8 × 223/18",
+      "8 × 223/3",
+      "7 × 223/3"
+    ],
+    "workCorrect2": 2,
+    "options": [
+      "594 2/3",
+      "594 11/18",
+      "595 2/3",
+      "594 7/9"
+    ],
+    "correct": 0,
+    "hint": "המר תחילה את המספר המעורב לשבר מדומה; אחר כך חפש צמצום עם המכנה.",
+    "feedback": "המרה: 12 7/18 = 223/18. לאחר צמצום וכפל התוצאה היא 594 2/3.",
+    "exact": "1784/3",
+    "two_step_work": true
+  },
+  {
+    "id": 60046,
+    "tier": 5,
+    "operation": "mixed_times_whole",
+    "whole": 72,
+    "mixedWhole": 17,
+    "numerator": 11,
+    "denominator": 24,
+    "prompt": "חשב: 72 × 17 11/24",
+    "workPrompt1": "מהי ההמרה הנכונה של המספר המעורב לשבר מדומה?",
+    "workOptions1": [
+      "72 × 28/24",
+      "72 × 420/24",
+      "72 × 419/25",
+      "72 × 419/24"
+    ],
+    "workCorrect1": 3,
+    "workPrompt2": "לאחר ההמרה, איזה צמצום נכון לבצע לפני הכפל?",
+    "workOptions2": [
+      "72 × 419/1",
+      "3 × 419/24",
+      "3 × 419/1",
+      "2 × 419/1"
+    ],
+    "workCorrect2": 2,
+    "options": [
+      "1256 23/24",
+      "1258",
+      "1257 1/12",
+      "1257"
+    ],
+    "correct": 3,
+    "hint": "המר תחילה את המספר המעורב לשבר מדומה; אחר כך חפש צמצום עם המכנה.",
+    "feedback": "המרה: 17 11/24 = 419/24. לאחר צמצום וכפל התוצאה היא 1257.",
+    "exact": "1257/1",
+    "two_step_work": true
+  },
+  {
+    "id": 60047,
+    "tier": 5,
+    "operation": "mixed_times_whole",
+    "whole": 75,
+    "mixedWhole": 14,
+    "numerator": 13,
+    "denominator": 25,
+    "prompt": "חשב: 75 × 14 13/25",
+    "workPrompt1": "מהי ההמרה הנכונה של המספר המעורב לשבר מדומה?",
+    "workOptions1": [
+      "75 × 27/25",
+      "75 × 364/25",
+      "75 × 363/25",
+      "75 × 363/26"
+    ],
+    "workCorrect1": 2,
+    "workPrompt2": "לאחר ההמרה, איזה צמצום נכון לבצע לפני הכפל?",
+    "workOptions2": [
+      "75 × 363/1",
+      "3 × 363/25",
+      "3 × 363/1",
+      "2 × 363/1"
+    ],
+    "workCorrect2": 2,
+    "options": [
+      "1088 24/25",
+      "1090",
+      "1089",
+      "1089 2/25"
+    ],
+    "correct": 2,
+    "hint": "המר תחילה את המספר המעורב לשבר מדומה; אחר כך חפש צמצום עם המכנה.",
+    "feedback": "המרה: 14 13/25 = 363/25. לאחר צמצום וכפל התוצאה היא 1089.",
+    "exact": "1089/1",
+    "two_step_work": true
+  },
+  {
+    "id": 60048,
+    "tier": 5,
+    "operation": "mixed_times_whole",
+    "whole": 64,
+    "mixedWhole": 15,
+    "numerator": 19,
+    "denominator": 28,
+    "prompt": "חשב: 64 × 15 19/28",
+    "workPrompt1": "מהי ההמרה הנכונה של המספר המעורב לשבר מדומה?",
+    "workOptions1": [
+      "64 × 34/28",
+      "64 × 439/28",
+      "64 × 440/28",
+      "64 × 439/29"
+    ],
+    "workCorrect1": 1,
+    "workPrompt2": "לאחר ההמרה, איזה צמצום נכון לבצע לפני הכפל?",
+    "workOptions2": [
+      "64 × 439/7",
+      "16 × 439/28",
+      "16 × 439/7",
+      "15 × 439/7"
+    ],
+    "workCorrect2": 2,
+    "options": [
+      "1003 11/28",
+      "1003 3/7",
+      "1004 3/7",
+      "1003 1/2"
+    ],
+    "correct": 1,
+    "hint": "המר תחילה את המספר המעורב לשבר מדומה; אחר כך חפש צמצום עם המכנה.",
+    "feedback": "המרה: 15 19/28 = 439/28. לאחר צמצום וכפל התוצאה היא 1003 3/7.",
+    "exact": "7024/7",
+    "two_step_work": true
+  },
+  {
+    "id": 60049,
+    "tier": 5,
+    "operation": "mixed_times_whole",
+    "whole": 80,
+    "mixedWhole": 18,
+    "numerator": 23,
+    "denominator": 30,
+    "prompt": "חשב: 80 × 18 23/30",
+    "workPrompt1": "מהי ההמרה הנכונה של המספר המעורב לשבר מדומה?",
+    "workOptions1": [
+      "80 × 563/30",
+      "80 × 41/30",
+      "80 × 564/30",
+      "80 × 563/31"
+    ],
+    "workCorrect1": 0,
+    "workPrompt2": "לאחר ההמרה, איזה צמצום נכון לבצע לפני הכפל?",
+    "workOptions2": [
+      "80 × 563/3",
+      "8 × 563/30",
+      "8 × 563/3",
+      "7 × 563/3"
+    ],
+    "workCorrect2": 2,
+    "options": [
+      "1501 1/3",
+      "1501 3/10",
+      "1502 1/3",
+      "1501 2/5"
+    ],
+    "correct": 0,
+    "hint": "המר תחילה את המספר המעורב לשבר מדומה; אחר כך חפש צמצום עם המכנה.",
+    "feedback": "המרה: 18 23/30 = 563/30. לאחר צמצום וכפל התוצאה היא 1501 1/3.",
+    "exact": "4504/3",
+    "two_step_work": true
+  },
+  {
+    "id": 60050,
+    "tier": 6,
+    "operation": "fraction_times_whole",
+    "whole": 84,
+    "numerator": 31,
+    "denominator": 42,
+    "prompt": "חשב: 84 × 31/42",
+    "workPrompt1": "מהו הצמצום הנכון לפני הכפל?",
+    "workOptions1": [
+      "84 × 31/1",
+      "2 × 31/42",
+      "2 × 32/1",
+      "2 × 31/1"
+    ],
+    "workCorrect1": 3,
+    "workPrompt2": "אחרי הצמצום, מהו שבר המכפלה לפני המרה למספר מעורב?",
+    "workOptions2": [
+      "63/1",
+      "33/1",
+      "62/1",
+      "62/2"
+    ],
+    "workCorrect2": 2,
+    "options": [
+      "61 41/42",
+      "63",
+      "62 1/21",
+      "62"
+    ],
+    "correct": 3,
+    "hint": "חפש גורם משותף בין המספר השלם למכנה לפני שמכפילים.",
+    "feedback": "דרך יעילה: צמצום אם אפשר, כפל, צמצום סופי והמרה. התוצאה: 62.",
+    "exact": "62/1",
+    "two_step_work": true
+  },
+  {
+    "id": 60051,
+    "tier": 6,
+    "operation": "fraction_times_whole",
+    "whole": 96,
+    "numerator": 35,
+    "denominator": 48,
+    "prompt": "חשב: 96 × 35/48",
+    "workPrompt1": "מהו הצמצום הנכון לפני הכפל?",
+    "workOptions1": [
+      "96 × 35/1",
+      "2 × 35/48",
+      "2 × 35/1",
+      "2 × 36/1"
+    ],
+    "workCorrect1": 2,
+    "workPrompt2": "אחרי הצמצום, מהו שבר המכפלה לפני המרה למספר מעורב?",
+    "workOptions2": [
+      "71/1",
+      "37/1",
+      "70/1",
+      "70/2"
+    ],
+    "workCorrect2": 2,
+    "options": [
+      "69 47/48",
+      "71",
+      "70",
+      "70 1/24"
+    ],
+    "correct": 2,
+    "hint": "חפש גורם משותף בין המספר השלם למכנה לפני שמכפילים.",
+    "feedback": "דרך יעילה: צמצום אם אפשר, כפל, צמצום סופי והמרה. התוצאה: 70.",
+    "exact": "70/1",
+    "two_step_work": true
+  },
+  {
+    "id": 60052,
+    "tier": 6,
+    "operation": "fraction_times_whole",
+    "whole": 108,
+    "numerator": 37,
+    "denominator": 45,
+    "prompt": "חשב: 108 × 37/45",
+    "workPrompt1": "מהו הצמצום הנכון לפני הכפל?",
+    "workOptions1": [
+      "108 × 37/5",
+      "12 × 37/5",
+      "12 × 37/45",
+      "12 × 38/5"
+    ],
+    "workCorrect1": 1,
+    "workPrompt2": "אחרי הצמצום, מהו שבר המכפלה לפני המרה למספר מעורב?",
+    "workOptions2": [
+      "445/5",
+      "49/5",
+      "444/5",
+      "444/6"
+    ],
+    "workCorrect2": 2,
+    "options": [
+      "88 7/9",
+      "88 4/5",
+      "89 4/5",
+      "88 38/45"
+    ],
+    "correct": 1,
+    "hint": "חפש גורם משותף בין המספר השלם למכנה לפני שמכפילים.",
+    "feedback": "דרך יעילה: צמצום אם אפשר, כפל, צמצום סופי והמרה. התוצאה: 88 4/5.",
+    "exact": "444/5",
+    "two_step_work": true
+  },
+  {
+    "id": 60053,
+    "tier": 6,
+    "operation": "fraction_times_whole",
+    "whole": 112,
+    "numerator": 41,
+    "denominator": 48,
+    "prompt": "חשב: 112 × 41/48",
+    "workPrompt1": "מהו הצמצום הנכון לפני הכפל?",
+    "workOptions1": [
+      "7 × 41/3",
+      "112 × 41/3",
+      "7 × 41/48",
+      "7 × 42/3"
+    ],
+    "workCorrect1": 0,
+    "workPrompt2": "אחרי הצמצום, מהו שבר המכפלה לפני המרה למספר מעורב?",
+    "workOptions2": [
+      "288/3",
+      "48/3",
+      "287/3",
+      "287/4"
+    ],
+    "workCorrect2": 2,
+    "options": [
+      "95 2/3",
+      "95 31/48",
+      "96 2/3",
+      "95 17/24"
+    ],
+    "correct": 0,
+    "hint": "חפש גורם משותף בין המספר השלם למכנה לפני שמכפילים.",
+    "feedback": "דרך יעילה: צמצום אם אפשר, כפל, צמצום סופי והמרה. התוצאה: 95 2/3.",
+    "exact": "287/3",
+    "two_step_work": true
+  },
+  {
+    "id": 60054,
+    "tier": 6,
+    "operation": "fraction_times_whole",
+    "whole": 120,
+    "numerator": 43,
+    "denominator": 45,
+    "prompt": "חשב: 120 × 43/45",
+    "workPrompt1": "מהו הצמצום הנכון לפני הכפל?",
+    "workOptions1": [
+      "120 × 43/3",
+      "8 × 43/45",
+      "8 × 44/3",
+      "8 × 43/3"
+    ],
+    "workCorrect1": 3,
+    "workPrompt2": "אחרי הצמצום, מהו שבר המכפלה לפני המרה למספר מעורב?",
+    "workOptions2": [
+      "345/3",
+      "51/3",
+      "344/3",
+      "344/4"
+    ],
+    "workCorrect2": 2,
+    "options": [
+      "114 29/45",
+      "115 2/3",
+      "114 32/45",
+      "114 2/3"
+    ],
+    "correct": 3,
+    "hint": "חפש גורם משותף בין המספר השלם למכנה לפני שמכפילים.",
+    "feedback": "דרך יעילה: צמצום אם אפשר, כפל, צמצום סופי והמרה. התוצאה: 114 2/3.",
+    "exact": "344/3",
+    "two_step_work": true
+  },
+  {
+    "id": 60055,
+    "tier": 6,
+    "operation": "mixed_times_whole",
+    "whole": 84,
+    "mixedWhole": 21,
+    "numerator": 17,
+    "denominator": 42,
+    "prompt": "חשב: 84 × 21 17/42",
+    "workPrompt1": "מהי ההמרה הנכונה של המספר המעורב לשבר מדומה?",
+    "workOptions1": [
+      "84 × 38/42",
+      "84 × 900/42",
+      "84 × 899/42",
+      "84 × 899/43"
+    ],
+    "workCorrect1": 2,
+    "workPrompt2": "לאחר ההמרה, איזה צמצום נכון לבצע לפני הכפל?",
+    "workOptions2": [
+      "84 × 899/1",
+      "2 × 899/42",
+      "2 × 899/1",
+      "1 × 899/1"
+    ],
+    "workCorrect2": 2,
+    "options": [
+      "1797 41/42",
+      "1799",
+      "1798",
+      "1798 1/21"
+    ],
+    "correct": 2,
+    "hint": "המר תחילה את המספר המעורב לשבר מדומה; אחר כך חפש צמצום עם המכנה.",
+    "feedback": "המרה: 21 17/42 = 899/42. לאחר צמצום וכפל התוצאה היא 1798.",
+    "exact": "1798/1",
+    "two_step_work": true
+  },
+  {
+    "id": 60056,
+    "tier": 6,
+    "operation": "mixed_times_whole",
+    "whole": 96,
+    "mixedWhole": 24,
+    "numerator": 23,
+    "denominator": 48,
+    "prompt": "חשב: 96 × 24 23/48",
+    "workPrompt1": "מהי ההמרה הנכונה של המספר המעורב לשבר מדומה?",
+    "workOptions1": [
+      "96 × 47/48",
+      "96 × 1175/48",
+      "96 × 1176/48",
+      "96 × 1175/49"
+    ],
+    "workCorrect1": 1,
+    "workPrompt2": "לאחר ההמרה, איזה צמצום נכון לבצע לפני הכפל?",
+    "workOptions2": [
+      "96 × 1175/1",
+      "2 × 1175/48",
+      "2 × 1175/1",
+      "1 × 1175/1"
+    ],
+    "workCorrect2": 2,
+    "options": [
+      "2349 47/48",
+      "2350",
+      "2351",
+      "2350 1/24"
+    ],
+    "correct": 1,
+    "hint": "המר תחילה את המספר המעורב לשבר מדומה; אחר כך חפש צמצום עם המכנה.",
+    "feedback": "המרה: 24 23/48 = 1175/48. לאחר צמצום וכפל התוצאה היא 2350.",
+    "exact": "2350/1",
+    "two_step_work": true
+  },
+  {
+    "id": 60057,
+    "tier": 6,
+    "operation": "mixed_times_whole",
+    "whole": 108,
+    "mixedWhole": 27,
+    "numerator": 31,
+    "denominator": 45,
+    "prompt": "חשב: 108 × 27 31/45",
+    "workPrompt1": "מהי ההמרה הנכונה של המספר המעורב לשבר מדומה?",
+    "workOptions1": [
+      "108 × 1246/45",
+      "108 × 58/45",
+      "108 × 1247/45",
+      "108 × 1246/46"
+    ],
+    "workCorrect1": 0,
+    "workPrompt2": "לאחר ההמרה, איזה צמצום נכון לבצע לפני הכפל?",
+    "workOptions2": [
+      "108 × 1246/5",
+      "12 × 1246/45",
+      "12 × 1246/5",
+      "11 × 1246/5"
+    ],
+    "workCorrect2": 2,
+    "options": [
+      "2990 2/5",
+      "2990 17/45",
+      "2991 2/5",
+      "2990 4/9"
+    ],
+    "correct": 0,
+    "hint": "המר תחילה את המספר המעורב לשבר מדומה; אחר כך חפש צמצום עם המכנה.",
+    "feedback": "המרה: 27 31/45 = 1246/45. לאחר צמצום וכפל התוצאה היא 2990 2/5.",
+    "exact": "14952/5",
+    "two_step_work": true
+  },
+  {
+    "id": 60058,
+    "tier": 6,
+    "operation": "mixed_times_whole",
+    "whole": 112,
+    "mixedWhole": 29,
+    "numerator": 35,
+    "denominator": 48,
+    "prompt": "חשב: 112 × 29 35/48",
+    "workPrompt1": "מהי ההמרה הנכונה של המספר המעורב לשבר מדומה?",
+    "workOptions1": [
+      "112 × 64/48",
+      "112 × 1428/48",
+      "112 × 1427/49",
+      "112 × 1427/48"
+    ],
+    "workCorrect1": 3,
+    "workPrompt2": "לאחר ההמרה, איזה צמצום נכון לבצע לפני הכפל?",
+    "workOptions2": [
+      "112 × 1427/3",
+      "7 × 1427/48",
+      "7 × 1427/3",
+      "6 × 1427/3"
+    ],
+    "workCorrect2": 2,
+    "options": [
+      "3329 31/48",
+      "3330 2/3",
+      "3329 17/24",
+      "3329 2/3"
+    ],
+    "correct": 3,
+    "hint": "המר תחילה את המספר המעורב לשבר מדומה; אחר כך חפש צמצום עם המכנה.",
+    "feedback": "המרה: 29 35/48 = 1427/48. לאחר צמצום וכפל התוצאה היא 3329 2/3.",
+    "exact": "9989/3",
+    "two_step_work": true
+  },
+  {
+    "id": 60059,
+    "tier": 6,
+    "operation": "mixed_times_whole",
+    "whole": 120,
+    "mixedWhole": 32,
+    "numerator": 37,
+    "denominator": 45,
+    "prompt": "חשב: 120 × 32 37/45",
+    "workPrompt1": "מהי ההמרה הנכונה של המספר המעורב לשבר מדומה?",
+    "workOptions1": [
+      "120 × 69/45",
+      "120 × 1478/45",
+      "120 × 1477/45",
+      "120 × 1477/46"
+    ],
+    "workCorrect1": 2,
+    "workPrompt2": "לאחר ההמרה, איזה צמצום נכון לבצע לפני הכפל?",
+    "workOptions2": [
+      "120 × 1477/3",
+      "8 × 1477/45",
+      "8 × 1477/3",
+      "7 × 1477/3"
+    ],
+    "workCorrect2": 2,
+    "options": [
+      "3938 29/45",
+      "3939 2/3",
+      "3938 2/3",
+      "3938 32/45"
+    ],
+    "correct": 2,
+    "hint": "המר תחילה את המספר המעורב לשבר מדומה; אחר כך חפש צמצום עם המכנה.",
+    "feedback": "המרה: 32 37/45 = 1477/45. לאחר צמצום וכפל התוצאה היא 3938 2/3.",
+    "exact": "11816/3",
+    "two_step_work": true
+  },
+  {
+    "id": 60060,
+    "tier": 7,
+    "operation": "fraction_times_whole",
+    "whole": 126,
+    "numerator": 47,
+    "denominator": 63,
+    "prompt": "חשב: 126 × 47/63",
+    "workPrompt1": "מהו הצמצום הנכון לפני הכפל?",
+    "workOptions1": [
+      "126 × 47/1",
+      "2 × 47/1",
+      "2 × 47/63",
+      "2 × 48/1"
+    ],
+    "workCorrect1": 1,
+    "workPrompt2": "אחרי הצמצום, מהו שבר המכפלה לפני המרה למספר מעורב?",
+    "workOptions2": [
+      "95/1",
+      "49/1",
+      "94/1",
+      "94/2"
+    ],
+    "workCorrect2": 2,
+    "options": [
+      "93 62/63",
+      "94",
+      "95",
+      "94 2/63"
+    ],
+    "correct": 1,
+    "hint": "חפש גורם משותף בין המספר השלם למכנה לפני שמכפילים.",
+    "feedback": "דרך יעילה: צמצום אם אפשר, כפל, צמצום סופי והמרה. התוצאה: 94.",
+    "exact": "94/1",
+    "two_step_work": true
+  },
+  {
+    "id": 60061,
+    "tier": 7,
+    "operation": "fraction_times_whole",
+    "whole": 144,
+    "numerator": 55,
+    "denominator": 72,
+    "prompt": "חשב: 144 × 55/72",
+    "workPrompt1": "מהו הצמצום הנכון לפני הכפל?",
+    "workOptions1": [
+      "2 × 55/1",
+      "144 × 55/1",
+      "2 × 55/72",
+      "2 × 56/1"
+    ],
+    "workCorrect1": 0,
+    "workPrompt2": "אחרי הצמצום, מהו שבר המכפלה לפני המרה למספר מעורב?",
+    "workOptions2": [
+      "111/1",
+      "57/1",
+      "110/1",
+      "110/2"
+    ],
+    "workCorrect2": 2,
+    "options": [
+      "110",
+      "109 71/72",
+      "111",
+      "110 1/36"
+    ],
+    "correct": 0,
+    "hint": "חפש גורם משותף בין המספר השלם למכנה לפני שמכפילים.",
+    "feedback": "דרך יעילה: צמצום אם אפשר, כפל, צמצום סופי והמרה. התוצאה: 110.",
+    "exact": "110/1",
+    "two_step_work": true
+  },
+  {
+    "id": 60062,
+    "tier": 7,
+    "operation": "fraction_times_whole",
+    "whole": 168,
+    "numerator": 59,
+    "denominator": 64,
+    "prompt": "חשב: 168 × 59/64",
+    "workPrompt1": "מהו הצמצום הנכון לפני הכפל?",
+    "workOptions1": [
+      "168 × 59/8",
+      "21 × 59/64",
+      "21 × 60/8",
+      "21 × 59/8"
+    ],
+    "workCorrect1": 3,
+    "workPrompt2": "אחרי הצמצום, מהו שבר המכפלה לפני המרה למספר מעורב?",
+    "workOptions2": [
+      "1240/8",
+      "80/8",
+      "1239/8",
+      "1239/9"
+    ],
+    "workCorrect2": 2,
+    "options": [
+      "154 55/64",
+      "155 7/8",
+      "154 29/32",
+      "154 7/8"
+    ],
+    "correct": 3,
+    "hint": "חפש גורם משותף בין המספר השלם למכנה לפני שמכפילים.",
+    "feedback": "דרך יעילה: צמצום אם אפשר, כפל, צמצום סופי והמרה. התוצאה: 154 7/8.",
+    "exact": "1239/8",
+    "two_step_work": true
+  },
+  {
+    "id": 60063,
+    "tier": 7,
+    "operation": "fraction_times_whole",
+    "whole": 180,
+    "numerator": 61,
+    "denominator": 72,
+    "prompt": "חשב: 180 × 61/72",
+    "workPrompt1": "מהו הצמצום הנכון לפני הכפל?",
+    "workOptions1": [
+      "180 × 61/2",
+      "5 × 61/72",
+      "5 × 61/2",
+      "5 × 62/2"
+    ],
+    "workCorrect1": 2,
+    "workPrompt2": "אחרי הצמצום, מהו שבר המכפלה לפני המרה למספר מעורב?",
+    "workOptions2": [
+      "306/2",
+      "66/2",
+      "305/2",
+      "305/3"
+    ],
+    "workCorrect2": 2,
+    "options": [
+      "152 35/72",
+      "153 1/2",
+      "152 1/2",
+      "152 19/36"
+    ],
+    "correct": 2,
+    "hint": "חפש גורם משותף בין המספר השלם למכנה לפני שמכפילים.",
+    "feedback": "דרך יעילה: צמצום אם אפשר, כפל, צמצום סופי והמרה. התוצאה: 152 1/2.",
+    "exact": "305/2",
+    "two_step_work": true
+  },
+  {
+    "id": 60064,
+    "tier": 7,
+    "operation": "fraction_times_whole",
+    "whole": 192,
+    "numerator": 65,
+    "denominator": 72,
+    "prompt": "חשב: 192 × 65/72",
+    "workPrompt1": "מהו הצמצום הנכון לפני הכפל?",
+    "workOptions1": [
+      "192 × 65/3",
+      "8 × 65/3",
+      "8 × 65/72",
+      "8 × 66/3"
+    ],
+    "workCorrect1": 1,
+    "workPrompt2": "אחרי הצמצום, מהו שבר המכפלה לפני המרה למספר מעורב?",
+    "workOptions2": [
+      "521/3",
+      "73/3",
+      "520/3",
+      "520/4"
+    ],
+    "workCorrect2": 2,
+    "options": [
+      "173 23/72",
+      "173 1/3",
+      "174 1/3",
+      "173 13/36"
+    ],
+    "correct": 1,
+    "hint": "חפש גורם משותף בין המספר השלם למכנה לפני שמכפילים.",
+    "feedback": "דרך יעילה: צמצום אם אפשר, כפל, צמצום סופי והמרה. התוצאה: 173 1/3.",
+    "exact": "520/3",
+    "two_step_work": true
+  },
+  {
+    "id": 60065,
+    "tier": 7,
+    "operation": "mixed_times_whole",
+    "whole": 126,
+    "mixedWhole": 36,
+    "numerator": 31,
+    "denominator": 63,
+    "prompt": "חשב: 126 × 36 31/63",
+    "workPrompt1": "מהי ההמרה הנכונה של המספר המעורב לשבר מדומה?",
+    "workOptions1": [
+      "126 × 2299/63",
+      "126 × 67/63",
+      "126 × 2300/63",
+      "126 × 2299/64"
+    ],
+    "workCorrect1": 0,
+    "workPrompt2": "לאחר ההמרה, איזה צמצום נכון לבצע לפני הכפל?",
+    "workOptions2": [
+      "126 × 2299/1",
+      "2 × 2299/63",
+      "2 × 2299/1",
+      "1 × 2299/1"
+    ],
+    "workCorrect2": 2,
+    "options": [
+      "4598",
+      "4597 62/63",
+      "4599",
+      "4598 2/63"
+    ],
+    "correct": 0,
+    "hint": "המר תחילה את המספר המעורב לשבר מדומה; אחר כך חפש צמצום עם המכנה.",
+    "feedback": "המרה: 36 31/63 = 2299/63. לאחר צמצום וכפל התוצאה היא 4598.",
+    "exact": "4598/1",
+    "two_step_work": true
+  },
+  {
+    "id": 60066,
+    "tier": 7,
+    "operation": "mixed_times_whole",
+    "whole": 144,
+    "mixedWhole": 42,
+    "numerator": 35,
+    "denominator": 72,
+    "prompt": "חשב: 144 × 42 35/72",
+    "workPrompt1": "מהי ההמרה הנכונה של המספר המעורב לשבר מדומה?",
+    "workOptions1": [
+      "144 × 77/72",
+      "144 × 3060/72",
+      "144 × 3059/73",
+      "144 × 3059/72"
+    ],
+    "workCorrect1": 3,
+    "workPrompt2": "לאחר ההמרה, איזה צמצום נכון לבצע לפני הכפל?",
+    "workOptions2": [
+      "144 × 3059/1",
+      "2 × 3059/72",
+      "2 × 3059/1",
+      "1 × 3059/1"
+    ],
+    "workCorrect2": 2,
+    "options": [
+      "6117 71/72",
+      "6119",
+      "6118 1/36",
+      "6118"
+    ],
+    "correct": 3,
+    "hint": "המר תחילה את המספר המעורב לשבר מדומה; אחר כך חפש צמצום עם המכנה.",
+    "feedback": "המרה: 42 35/72 = 3059/72. לאחר צמצום וכפל התוצאה היא 6118.",
+    "exact": "6118/1",
+    "two_step_work": true
+  },
+  {
+    "id": 60067,
+    "tier": 7,
+    "operation": "mixed_times_whole",
+    "whole": 168,
+    "mixedWhole": 48,
+    "numerator": 47,
+    "denominator": 64,
+    "prompt": "חשב: 168 × 48 47/64",
+    "workPrompt1": "מהי ההמרה הנכונה של המספר המעורב לשבר מדומה?",
+    "workOptions1": [
+      "168 × 95/64",
+      "168 × 3120/64",
+      "168 × 3119/64",
+      "168 × 3119/65"
+    ],
+    "workCorrect1": 2,
+    "workPrompt2": "לאחר ההמרה, איזה צמצום נכון לבצע לפני הכפל?",
+    "workOptions2": [
+      "168 × 3119/8",
+      "21 × 3119/64",
+      "21 × 3119/8",
+      "20 × 3119/8"
+    ],
+    "workCorrect2": 2,
+    "options": [
+      "8187 23/64",
+      "8188 3/8",
+      "8187 3/8",
+      "8187 13/32"
+    ],
+    "correct": 2,
+    "hint": "המר תחילה את המספר המעורב לשבר מדומה; אחר כך חפש צמצום עם המכנה.",
+    "feedback": "המרה: 48 47/64 = 3119/64. לאחר צמצום וכפל התוצאה היא 8187 3/8.",
+    "exact": "65499/8",
+    "two_step_work": true
+  },
+  {
+    "id": 60068,
+    "tier": 7,
+    "operation": "mixed_times_whole",
+    "whole": 180,
+    "mixedWhole": 52,
+    "numerator": 49,
+    "denominator": 72,
+    "prompt": "חשב: 180 × 52 49/72",
+    "workPrompt1": "מהי ההמרה הנכונה של המספר המעורב לשבר מדומה?",
+    "workOptions1": [
+      "180 × 101/72",
+      "180 × 3793/72",
+      "180 × 3794/72",
+      "180 × 3793/73"
+    ],
+    "workCorrect1": 1,
+    "workPrompt2": "לאחר ההמרה, איזה צמצום נכון לבצע לפני הכפל?",
+    "workOptions2": [
+      "180 × 3793/2",
+      "5 × 3793/72",
+      "5 × 3793/2",
+      "4 × 3793/2"
+    ],
+    "workCorrect2": 2,
+    "options": [
+      "9482 35/72",
+      "9482 1/2",
+      "9483 1/2",
+      "9482 19/36"
+    ],
+    "correct": 1,
+    "hint": "המר תחילה את המספר המעורב לשבר מדומה; אחר כך חפש צמצום עם המכנה.",
+    "feedback": "המרה: 52 49/72 = 3793/72. לאחר צמצום וכפל התוצאה היא 9482 1/2.",
+    "exact": "18965/2",
+    "two_step_work": true
+  },
+  {
+    "id": 60069,
+    "tier": 7,
+    "operation": "mixed_times_whole",
+    "whole": 192,
+    "mixedWhole": 57,
+    "numerator": 53,
+    "denominator": 72,
+    "prompt": "חשב: 192 × 57 53/72",
+    "workPrompt1": "מהי ההמרה הנכונה של המספר המעורב לשבר מדומה?",
+    "workOptions1": [
+      "192 × 4157/72",
+      "192 × 110/72",
+      "192 × 4158/72",
+      "192 × 4157/73"
+    ],
+    "workCorrect1": 0,
+    "workPrompt2": "לאחר ההמרה, איזה צמצום נכון לבצע לפני הכפל?",
+    "workOptions2": [
+      "192 × 4157/3",
+      "8 × 4157/72",
+      "8 × 4157/3",
+      "7 × 4157/3"
+    ],
+    "workCorrect2": 2,
+    "options": [
+      "11085 1/3",
+      "11085 23/72",
+      "11086 1/3",
+      "11085 13/36"
+    ],
+    "correct": 0,
+    "hint": "המר תחילה את המספר המעורב לשבר מדומה; אחר כך חפש צמצום עם המכנה.",
+    "feedback": "המרה: 57 53/72 = 4157/72. לאחר צמצום וכפל התוצאה היא 11085 1/3.",
+    "exact": "33256/3",
+    "two_step_work": true
+  }
+]

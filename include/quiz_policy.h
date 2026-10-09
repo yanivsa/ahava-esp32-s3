@@ -3,23 +3,20 @@
 #include <stdint.h>
 #include "subjects.h"
 
-/**
- * A question counts only when the current display was answered correctly
- * before any hint/retry was used.
- */
+/** A question counts only when answered correctly before any hint/retry. */
 static inline bool quiz_policy_should_count(bool is_correct, bool hint_used) {
     return is_correct && !hint_used;
 }
 
-/**
- * Daily subject caps: mathematics (subject 0) is unlimited across all profiles;
- * Hebrew/language, English, and Judaism/Halacha (subjects 1-3) are capped at 10
- * counted questions per day.
- */
+/** Exam preparation is deliberate practice and never creates Time+ credit. */
+static inline bool quiz_policy_grants_timeplus_credit(int subject_id) {
+    return subject_id != AHAVA_SUBJECT_EXAM_PREP;
+}
+
+/** Only Judaism/Halacha is capped at ten counted questions per day. */
 static inline uint32_t quiz_policy_daily_limit(int profile, int subject_id) {
     (void)profile;
-    if (subject_id >= AHAVA_SUBJECT_HEBREW && subject_id < AHAVA_SUBJECT_COUNT) return 10u;
-    return UINT32_MAX;
+    return subject_id == AHAVA_SUBJECT_RELIGION ? 10u : UINT32_MAX;
 }
 
 typedef enum {
@@ -28,15 +25,6 @@ typedef enum {
     QUIZ_DAILY_ADOPT_DATE_KEEP_COUNTS
 } QuizDailyBucketAction_t;
 
-/**
- * Decide how to reconcile persisted daily counters with a newly available
- * trusted calendar date.
- *
- * If questions were counted while the clock was unsynchronized, resetting
- * them when SNTP later supplies a different date could allow a child to exceed
- * the real daily cap. In that case we conservatively adopt the trusted date
- * while preserving the already-counted activity.
- */
 static inline QuizDailyBucketAction_t quiz_policy_daily_bucket_action(
     uint32_t today, uint32_t saved_date, bool has_unsynced_activity) {
     if (today == 0 || saved_date == today) return QUIZ_DAILY_KEEP;
