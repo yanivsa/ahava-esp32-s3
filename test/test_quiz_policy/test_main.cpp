@@ -54,37 +54,37 @@ void test_typed_answer_accepts_curated_aliases() {
 
 void test_ori_prefers_typed_answers_when_recall_is_short_and_direct() {
     TEST_ASSERT_EQUAL(QUIZ_ANSWER_TEXT,
-        quiz_policy_answer_mode(PROFILE_ORI, AHAVA_SUBJECT_RELIGION,
+        quiz_policy_answer_mode(1, AHAVA_SUBJECT_RELIGION,
                                 "מתי מתחילים בני עדות המזרח לומר סליחות?",
                                 "ראש חודש אלול"));
     TEST_ASSERT_EQUAL(QUIZ_ANSWER_TEXT,
-        quiz_policy_answer_mode(PROFILE_ORI, AHAVA_SUBJECT_ENGLISH,
+        quiz_policy_answer_mode(1, AHAVA_SUBJECT_ENGLISH,
                                 "Translate: חלון", "window"));
     TEST_ASSERT_EQUAL(QUIZ_ANSWER_NUMBER,
-        quiz_policy_answer_mode(PROFILE_ORI, AHAVA_SUBJECT_MATH,
+        quiz_policy_answer_mode(1, AHAVA_SUBJECT_MATH,
                                 "כמה הם 7 כפול 8?", "56"));
 }
 
 void test_multiple_choice_is_kept_for_choice_style_or_long_answers() {
     TEST_ASSERT_EQUAL(QUIZ_ANSWER_MULTIPLE_CHOICE,
-        quiz_policy_answer_mode(PROFILE_ORI, AHAVA_SUBJECT_RELIGION,
+        quiz_policy_answer_mode(1, AHAVA_SUBJECT_RELIGION,
                                 "איזה משפט משווה נכון בין תחילת הסליחות של העדות?",
                                 "בני המזרח מתחילים מוקדם יותר מבני אשכנז"));
     TEST_ASSERT_EQUAL(QUIZ_ANSWER_MULTIPLE_CHOICE,
-        quiz_policy_answer_mode(PROFILE_ORI, AHAVA_SUBJECT_HEBREW,
+        quiz_policy_answer_mode(1, AHAVA_SUBJECT_HEBREW,
                                 "איזו מהאפשרויות מתארת בצורה המדויקת ביותר את המשפט?",
                                 "זוהי תשובה ארוכה שמחייבת בחירה בין ניסוחים קרובים ולכן אינה מתאימה להקלדה"));
     TEST_ASSERT_EQUAL(QUIZ_ANSWER_MULTIPLE_CHOICE,
-        quiz_policy_answer_mode(PROFILE_AYALA, AHAVA_SUBJECT_MATH,
+        quiz_policy_answer_mode(3, AHAVA_SUBJECT_MATH,
                                 "כמה תפוחים יש?", "2"));
 }
 
 void test_eitan_uses_typed_input_conservatively() {
     TEST_ASSERT_EQUAL(QUIZ_ANSWER_NUMBER,
-        quiz_policy_answer_mode(PROFILE_ETHAN, AHAVA_SUBJECT_MATH,
+        quiz_policy_answer_mode(2, AHAVA_SUBJECT_MATH,
                                 "כמה הם 6 כפול 7?", "42"));
     TEST_ASSERT_EQUAL(QUIZ_ANSWER_MULTIPLE_CHOICE,
-        quiz_policy_answer_mode(PROFILE_ETHAN, AHAVA_SUBJECT_RELIGION,
+        quiz_policy_answer_mode(2, AHAVA_SUBJECT_RELIGION,
                                 "מה עושים בחג?", "תשובה"));
 }
 
