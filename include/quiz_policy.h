@@ -466,6 +466,11 @@ static inline QuizAnswerMode_t quiz_policy_answer_mode(
     }
     if (subject_id == AHAVA_SUBJECT_HEBREW || subject_id == AHAVA_SUBJECT_ENGLISH ||
         subject_id == AHAVA_SUBJECT_RELIGION) {
+        double numeric_value = 0.0;
+        if (quiz_policy_parse_plain_number(correct_answer, &numeric_value)) return QUIZ_ANSWER_NUMBER;
+        for (const unsigned char *p = (const unsigned char *)correct_answer; *p; ++p) {
+            if (*p >= '0' && *p <= '9') return QUIZ_ANSWER_MULTIPLE_CHOICE;
+        }
         return QUIZ_ANSWER_TEXT;
     }
     return QUIZ_ANSWER_MULTIPLE_CHOICE;

@@ -67,6 +67,12 @@ void test_ori_prefers_typed_answers_when_recall_is_short_and_direct() {
         quiz_policy_answer_mode(1, AHAVA_SUBJECT_RELIGION,
                                 "מתי מתחילים בני עדות המזרח לומר סליחות?",
                                 "ראש חודש אלול"));
+    TEST_ASSERT_EQUAL(QUIZ_ANSWER_NUMBER,
+        quiz_policy_answer_mode(1, AHAVA_SUBJECT_RELIGION,
+                                "כמה פעמים מסובבים?", "3"));
+    TEST_ASSERT_EQUAL(QUIZ_ANSWER_MULTIPLE_CHOICE,
+        quiz_policy_answer_mode(1, AHAVA_SUBJECT_RELIGION,
+                                "איזה קשר מספרי נכון?", "יום 7 ו-7 הקפות"));
     TEST_ASSERT_EQUAL(QUIZ_ANSWER_TEXT,
         quiz_policy_answer_mode(1, AHAVA_SUBJECT_ENGLISH,
                                 "Translate: חלון", "window"));
