@@ -161,6 +161,52 @@ static inline bool quiz_policy_parse_plain_number(const char *input, double *val
     return true;
 }
 
+static inline bool quiz_policy_extract_single_number(const char *text, double *value) {
+    if (!text || !value) return false;
+    int count = 0;
+    double found = 0.0;
+    const char *p = text;
+    while (*p) {
+        bool start = (*p >= '0' && *p <= '9') ||
+                     ((*p == '-' || *p == '+') && p[1] >= '0' && p[1] <= '9');
+        if (!start) {
+            ++p;
+            continue;
+        }
+        char *end = nullptr;
+        double parsed = strtod(p, &end);
+        if (!end || end == p) {
+            ++p;
+            continue;
+        }
+        found = parsed;
+        ++count;
+        if (count > 1) return false;
+        p = end;
+    }
+    if (count != 1 || !isfinite(found)) return false;
+    *value = found;
+    return true;
+}
+
+static inline bool quiz_policy_scalar_alias_allowed(const char *canonical) {
+    if (!canonical) return false;
+    bool has_unit_or_assignment = false;
+    const unsigned char *p = (const unsigned char *)canonical;
+    while (*p) {
+        uint32_t cp = 0;
+        size_t used = quiz_policy_utf8_decode(p, &cp);
+        if (!used) break;
+        p += used;
+        if (cp >= 0x05D0 && cp <= 0x05EA) has_unit_or_assignment = true;
+        if (cp == '=' || cp == 0x00B0 || cp == 0x2032 || cp == 0x2033 || cp == '%' || cp == '"') {
+            has_unit_or_assignment = true;
+        }
+        if (cp == '^' || cp == '/' || cp == '<' || cp == '>') return false;
+    }
+    return has_unit_or_assignment;
+}
+
 static inline bool quiz_policy_typed_answer_matches(
     QuizAnswerMode_t mode, const char *input, const char *canonical,
     const char *alias1, const char *alias2, const char *alias3) {
@@ -169,9 +215,14 @@ static inline bool quiz_policy_typed_answer_matches(
 
     if (mode == QUIZ_ANSWER_NUMBER) {
         double a = 0.0, b = 0.0;
-        if (quiz_policy_parse_plain_number(input, &a) &&
-            quiz_policy_parse_plain_number(canonical, &b)) {
-            return fabs(a - b) < 1e-9;
+        if (quiz_policy_parse_plain_number(input, &a)) {
+            if (quiz_policy_parse_plain_number(canonical, &b)) {
+                return fabs(a - b) < 1e-9;
+            }
+            if (quiz_policy_scalar_alias_allowed(canonical) &&
+                quiz_policy_extract_single_number(canonical, &b)) {
+                return fabs(a - b) < 1e-9;
+            }
         }
     }
 
@@ -264,6 +315,74 @@ static inline bool quiz_policy_looks_numeric_answer(const char *answer) {
     return has_digit;
 }
 
+
+static inline bool quiz_policy_looks_math_expression(const char *answer) {
+    if (!answer || !*answer) return false;
+    bool has_value = false;
+    const unsigned char *p = (const unsigned char *)answer;
+    while (*p) {
+        uint32_t cp = 0;
+        size_t used = quiz_policy_utf8_decode(p, &cp);
+        if (!used) break;
+        p += used;
+        if ((cp >= '0' && cp <= '9') || cp == 'x' || cp == 'X' || cp == 'y' || cp == 'Y' ||
+            cp == 'a' || cp == 'A' || cp == 'b' || cp == 'B' || cp == 'm' || cp == 'M') {
+            has_value = true;
+            continue;
+        }
+        if (cp == ' ' || cp == '\t' || cp == '=' || cp == '^' || cp == '"' || cp == '-' ||
+            cp == '/' || cp == '%' || cp == '>' || cp == '<' || cp == '.' || cp == '+' ||
+            cp == ',' || cp == '*' || cp == ':' || cp == '(' || cp == ')' ||
+            cp == 0x00B0 || cp == 0x2032 || cp == 0x2033) {
+            continue;
+        }
+        return false;
+    }
+    return has_value;
+}
+
+static inline bool quiz_policy_is_single_number_with_units(const char *answer) {
+    if (!answer || !*answer) return false;
+    double value = 0.0;
+    if (!quiz_policy_extract_single_number(answer, &value)) return false;
+    bool has_hebrew_or_unit = false;
+    const unsigned char *p = (const unsigned char *)answer;
+    while (*p) {
+        uint32_t cp = 0;
+        size_t used = quiz_policy_utf8_decode(p, &cp);
+        if (!used) break;
+        p += used;
+        if ((cp >= 0x05D0 && cp <= 0x05EA) || cp == 0x00B0 || cp == 0x2032 ||
+            cp == 0x2033 || cp == '%' || cp == '"') {
+            has_hebrew_or_unit = true;
+        }
+    }
+    return has_hebrew_or_unit;
+}
+
+static inline bool quiz_policy_is_hebrew_or_xy_answer(const char *answer) {
+    if (!answer || !*answer) return false;
+    bool has_hebrew = false;
+    const unsigned char *p = (const unsigned char *)answer;
+    while (*p) {
+        uint32_t cp = 0;
+        size_t used = quiz_policy_utf8_decode(p, &cp);
+        if (!used) break;
+        p += used;
+        if (cp >= 0x05D0 && cp <= 0x05EA) {
+            has_hebrew = true;
+            continue;
+        }
+        if (cp >= 0x0591 && cp <= 0x05C7) continue;
+        if (cp == 'x' || cp == 'X' || cp == 'y' || cp == 'Y' || cp == ' ' || cp == '\t' ||
+            cp == '-' || cp == '"' || cp == 0x05F3 || cp == 0x05F4) {
+            continue;
+        }
+        return false;
+    }
+    return has_hebrew;
+}
+
 /**
  * Conservative automatic conversion policy.
  * Profile IDs intentionally mirror WizardProfile_t without importing LVGL-heavy screen_manager.h:
@@ -291,11 +410,16 @@ static inline QuizAnswerMode_t quiz_policy_answer_mode(
     }
 
     if (profile != 1) return QUIZ_ANSWER_MULTIPLE_CHOICE;
-    if (subject_id == AHAVA_SUBJECT_MATH && quiz_policy_looks_numeric_answer(correct_answer)) {
-        return QUIZ_ANSWER_NUMBER;
+    if (subject_id == AHAVA_SUBJECT_MATH) {
+        if (quiz_policy_looks_math_expression(correct_answer) ||
+            quiz_policy_is_single_number_with_units(correct_answer)) {
+            return QUIZ_ANSWER_NUMBER;
+        }
+        if (quiz_policy_is_hebrew_or_xy_answer(correct_answer)) return QUIZ_ANSWER_TEXT;
+        return QUIZ_ANSWER_MULTIPLE_CHOICE;
     }
-    if (subject_id == AHAVA_SUBJECT_MATH || subject_id == AHAVA_SUBJECT_HEBREW ||
-        subject_id == AHAVA_SUBJECT_ENGLISH || subject_id == AHAVA_SUBJECT_RELIGION) {
+    if (subject_id == AHAVA_SUBJECT_HEBREW || subject_id == AHAVA_SUBJECT_ENGLISH ||
+        subject_id == AHAVA_SUBJECT_RELIGION) {
         return QUIZ_ANSWER_TEXT;
     }
     return QUIZ_ANSWER_MULTIPLE_CHOICE;

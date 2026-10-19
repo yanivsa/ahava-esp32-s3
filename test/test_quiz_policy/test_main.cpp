@@ -45,6 +45,12 @@ void test_typed_answer_normalizes_numbers_english_and_hebrew() {
         QUIZ_ANSWER_TEXT, "שָׁאוּל", "שאול", nullptr, nullptr, nullptr));
     TEST_ASSERT_FALSE(quiz_policy_typed_answer_matches(
         QUIZ_ANSWER_TEXT, "דוד", "שאול", nullptr, nullptr, nullptr));
+    TEST_ASSERT_TRUE(quiz_policy_typed_answer_matches(
+        QUIZ_ANSWER_NUMBER, "27", "27 שקלים", nullptr, nullptr, nullptr));
+    TEST_ASSERT_TRUE(quiz_policy_typed_answer_matches(
+        QUIZ_ANSWER_NUMBER, "0", "x = 0", nullptr, nullptr, nullptr));
+    TEST_ASSERT_FALSE(quiz_policy_typed_answer_matches(
+        QUIZ_ANSWER_NUMBER, "2", "x^2", nullptr, nullptr, nullptr));
 }
 
 void test_typed_answer_accepts_curated_aliases() {
@@ -63,6 +69,15 @@ void test_ori_prefers_typed_answers_when_recall_is_short_and_direct() {
     TEST_ASSERT_EQUAL(QUIZ_ANSWER_NUMBER,
         quiz_policy_answer_mode(1, AHAVA_SUBJECT_MATH,
                                 "כמה הם 7 כפול 8?", "56"));
+    TEST_ASSERT_EQUAL(QUIZ_ANSWER_NUMBER,
+        quiz_policy_answer_mode(1, AHAVA_SUBJECT_MATH,
+                                "פתרו את המשוואה", "x = 0"));
+    TEST_ASSERT_EQUAL(QUIZ_ANSWER_NUMBER,
+        quiz_policy_answer_mode(1, AHAVA_SUBJECT_MATH,
+                                "כמה תעלה הנסיעה?", "27 שקלים"));
+    TEST_ASSERT_EQUAL(QUIZ_ANSWER_TEXT,
+        quiz_policy_answer_mode(1, AHAVA_SUBJECT_MATH,
+                                "האם הפונקציה עולה או יורדת?", "הפונקציה יורדת לכל x"));
 }
 
 void test_multiple_choice_is_kept_for_choice_style_or_long_answers() {

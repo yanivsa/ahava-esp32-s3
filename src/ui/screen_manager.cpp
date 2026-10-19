@@ -40,26 +40,26 @@ static const char * const QUIZ_HEBREW_KB_MAP[] = {
     "ק", "ר", "א", "ט", "ו", "ן", "ם", "פ", LV_SYMBOL_BACKSPACE, "\n",
     "ש", "ד", "ג", "כ", "ע", "י", "ח", "ל", "ך", "ף", "\n",
     "ז", "ס", "ב", "ה", "נ", "מ", "צ", "ת", "ץ", "\n",
-    " ", ""
+    "x", "y", " ", ""
 };
 static const lv_buttonmatrix_ctrl_t QUIZ_HEBREW_KB_CTRL[] = {
     1, 1, 1, 1, 1, 1, 1, 1, LV_KEYBOARD_CTRL_BUTTON_FLAGS | 2,
     1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
     1, 1, 1, 1, 1, 1, 1, 1, 1,
-    8
+    1, 1, 8
 };
 
 static const char * const QUIZ_NUMBER_KB_MAP[] = {
-    "1", "2", "3", LV_SYMBOL_BACKSPACE, "\n",
-    "4", "5", "6", "-", "\n",
-    "7", "8", "9", ".", "\n",
-    "/", "0", "%", "+", ""
+    "1", "2", "3", "x", "y", LV_SYMBOL_BACKSPACE, "\n",
+    "4", "5", "6", "a", "b", "=", "m", "\n",
+    "7", "8", "9", "^", "/", "%", ">", "\n",
+    "-", "0", ".", "+", "<", "*", ":", ""
 };
 static const lv_buttonmatrix_ctrl_t QUIZ_NUMBER_KB_CTRL[] = {
-    1, 1, 1, LV_KEYBOARD_CTRL_BUTTON_FLAGS | 2,
-    1, 1, 1, 1,
-    1, 1, 1, 1,
-    1, 1, 1, 1
+    1, 1, 1, 1, 1, LV_KEYBOARD_CTRL_BUTTON_FLAGS | 2,
+    1, 1, 1, 1, 1, 1, 1,
+    1, 1, 1, 1, 1, 1, 1,
+    1, 1, 1, 1, 1, 1, 1
 };
 
 /* Child Profiles Metadata */
@@ -537,7 +537,7 @@ static void build_typed_answer_ui(lv_obj_t *scr, lv_obj_t *answers_grid, QuizAns
                               current_subject_id == AHAVA_SUBJECT_ENGLISH ? LV_BASE_DIR_LTR : LV_BASE_DIR_RTL,
                               LV_PART_MAIN);
     if (mode == QUIZ_ANSWER_NUMBER) {
-        lv_textarea_set_accepted_chars(quiz_typed_input, "0123456789.,+-/% ");
+        lv_textarea_set_accepted_chars(quiz_typed_input, "0123456789xyabm=^.,+-/%><*:() ");
     }
     lv_obj_add_event_cb(quiz_typed_input, on_typed_answer_submit, LV_EVENT_READY, NULL);
 
