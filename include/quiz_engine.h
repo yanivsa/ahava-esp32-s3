@@ -33,6 +33,8 @@ typedef struct {
     const char *work_prompt_2;       /**< Optional second checkpoint */
     const char *work_answers_2[4];
     uint8_t work_correct_idx_2;
+    uint8_t answer_mode;             /**< 0=AUTO, 1=MC, 2=TEXT, 3=NUMBER */
+    const char *accepted_answers[3]; /**< Optional typed aliases beyond the canonical correct option */
 } Question_t;
 
 typedef enum {
