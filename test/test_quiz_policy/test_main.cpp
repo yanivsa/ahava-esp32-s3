@@ -51,6 +51,10 @@ void test_typed_answer_normalizes_numbers_english_and_hebrew() {
         QUIZ_ANSWER_NUMBER, "0", "x = 0", nullptr, nullptr, nullptr));
     TEST_ASSERT_FALSE(quiz_policy_typed_answer_matches(
         QUIZ_ANSWER_NUMBER, "2", "x^2", nullptr, nullptr, nullptr));
+    TEST_ASSERT_TRUE(quiz_policy_typed_answer_matches(
+        QUIZ_ANSWER_NUMBER, "x=0", "x = 0", nullptr, nullptr, nullptr));
+    TEST_ASSERT_FALSE(quiz_policy_typed_answer_matches(
+        QUIZ_ANSWER_NUMBER, "x*2", "x^2", nullptr, nullptr, nullptr));
 }
 
 void test_typed_answer_accepts_curated_aliases() {

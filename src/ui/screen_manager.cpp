@@ -597,6 +597,7 @@ static void on_answer_clicked(lv_event_t *e) {
     }
 
     bool is_correct = (clicked_idx == current_quiz_question->correct_idx);
+    const bool earns_reward = quiz_active_answer_earns_reward(is_correct);
 
     Serial.printf("[QUIZ] Answer clicked: %u (Correct: %u) -> %s\n",
                   clicked_idx, current_quiz_question->correct_idx,
@@ -634,14 +635,17 @@ static void on_answer_clicked(lv_event_t *e) {
     }
 
     if (is_correct) {
-        player_data_add_coins(current_profile, 10);
-        player_data_add_xp(current_profile, 25);
-
-
-        Serial.printf("[REWARD] Profile %d rewarded! New Coins: %u 🪙 | New XP: %u ⚡\n",
-                      (int)current_profile,
-                      player_data_get_coins(current_profile),
-                      player_data_get_xp(current_profile));
+        if (earns_reward) {
+            player_data_add_coins(current_profile, 10);
+            player_data_add_xp(current_profile, 25);
+            Serial.printf("[REWARD] Profile %d first-try reward! New Coins: %u | New XP: %u\n",
+                          (int)current_profile,
+                          player_data_get_coins(current_profile),
+                          player_data_get_xp(current_profile));
+        } else {
+            Serial.printf("[REWARD] Profile %d retry correct -> learning only, no coins/XP.\n",
+                          (int)current_profile);
+        }
 
         // Correct Answer: Radiant Emerald Green (#10B981)
         lv_obj_set_style_bg_color(clicked_btn, lv_color_hex(0x10B981), LV_PART_MAIN);
@@ -675,7 +679,10 @@ static void on_answer_clicked(lv_event_t *e) {
     lv_obj_center(mbox);
 
     // Title & Feedback Text
-    lv_obj_t *result_title = lv_msgbox_add_title(mbox, is_correct ? "נכון מאוד!" : "כמעט!");
+    const char *result_heading = is_correct
+        ? (earns_reward ? "נכון מאוד!" : "נכון בתיקון — ללא ניקוד")
+        : "כמעט!";
+    lv_obj_t *result_title = lv_msgbox_add_title(mbox, result_heading);
     lv_obj_t *result_text = lv_msgbox_add_text(mbox, current_quiz_question->feedback);
     for (lv_obj_t *label : {result_title, result_text}) {
         if (label) {

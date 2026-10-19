@@ -207,6 +207,38 @@ static inline bool quiz_policy_scalar_alias_allowed(const char *canonical) {
     return has_unit_or_assignment;
 }
 
+static inline void quiz_policy_normalize_math_expression(const char *input, char *out, size_t cap) {
+    if (!out || cap == 0) return;
+    out[0] = '\0';
+    if (!input) return;
+    size_t wr = 0;
+    const unsigned char *p = (const unsigned char *)input;
+    while (*p && wr + 1 < cap) {
+        uint32_t cp = 0;
+        size_t used = quiz_policy_utf8_decode(p, &cp);
+        if (!used) break;
+        p += used;
+        if (cp == ' ' || cp == '\t' || cp == '\n' || cp == '\r' || cp == ',') continue;
+        if (cp == 0x00D7) cp = '*';      /* multiplication sign */
+        else if (cp == 0x00F7) cp = '/'; /* division sign */
+        else if (cp == 0x2212) cp = '-'; /* unicode minus */
+        else if (cp == 0x00B0 || cp == 0x2032 || cp == 0x2033) continue; /* unit marks */
+
+        if (cp < 0x80) {
+            if (isalpha((int)cp)) cp = (uint32_t)tolower((int)cp);
+            const bool keep = isalnum((int)cp) || cp == '=' || cp == '^' || cp == '"' ||
+                              cp == '-' || cp == '/' || cp == '%' || cp == '>' || cp == '<' ||
+                              cp == '.' || cp == '+' || cp == '*' || cp == ':' ||
+                              cp == '(' || cp == ')';
+            if (!keep) return;
+            out[wr++] = (char)cp;
+        } else {
+            return;
+        }
+    }
+    out[wr] = '\0';
+}
+
 static inline bool quiz_policy_typed_answer_matches(
     QuizAnswerMode_t mode, const char *input, const char *canonical,
     const char *alias1, const char *alias2, const char *alias3) {
@@ -224,6 +256,20 @@ static inline bool quiz_policy_typed_answer_matches(
                 return fabs(a - b) < 1e-9;
             }
         }
+
+        char normalized_math_input[192];
+        quiz_policy_normalize_math_expression(input, normalized_math_input, sizeof(normalized_math_input));
+        if (!normalized_math_input[0]) return false;
+        const char *math_accepted[4] = {canonical, alias1, alias2, alias3};
+        for (const char *candidate : math_accepted) {
+            if (!candidate || !*candidate) continue;
+            char normalized_math_candidate[192];
+            quiz_policy_normalize_math_expression(candidate, normalized_math_candidate,
+                                                  sizeof(normalized_math_candidate));
+            if (normalized_math_candidate[0] &&
+                strcmp(normalized_math_input, normalized_math_candidate) == 0) return true;
+        }
+        return false;
     }
 
     char normalized_input[192];
