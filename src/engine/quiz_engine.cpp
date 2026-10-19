@@ -652,6 +652,11 @@ const char* quiz_get_active_work_prompt(void) {
     return "בחר את התשובה הסופית המצומצמת.";
 }
 
+bool quiz_active_answer_earns_reward(bool is_correct) {
+    if (!active_question) return false;
+    return quiz_policy_should_count(is_correct, hinted_question_id == active_question->id);
+}
+
 lv_event_dsc_t* quiz_register_event_cb(lv_obj_t *obj, lv_event_cb_t cb,
                                       lv_event_code_t filter, void *user_data,
                                       const char *callback_name) {

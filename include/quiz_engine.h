@@ -33,6 +33,8 @@ typedef struct {
     const char *work_prompt_2;       /**< Optional second checkpoint */
     const char *work_answers_2[4];
     uint8_t work_correct_idx_2;
+    uint8_t answer_mode;             /**< 0=AUTO, 1=MC, 2=TEXT, 3=NUMBER */
+    const char *accepted_answers[3]; /**< Optional typed aliases beyond the canonical correct option */
 } Question_t;
 
 typedef enum {
@@ -49,6 +51,7 @@ QuizPhase_t quiz_get_phase(void);
 bool quiz_check_work_choice(uint8_t selected_idx);
 const char* quiz_get_active_answer_text(uint8_t index);
 const char* quiz_get_active_work_prompt(void);
+bool quiz_active_answer_earns_reward(bool is_correct);
 
 lv_event_dsc_t* quiz_register_event_cb(lv_obj_t *obj, lv_event_cb_t cb,
                                       lv_event_code_t filter, void *user_data,

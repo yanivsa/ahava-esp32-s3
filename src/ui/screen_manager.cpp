@@ -7,6 +7,7 @@
 #include "subjects.h"
 #include "theme_manager.h"
 #include "quiz_engine.h"
+#include "quiz_policy.h"
 #include "player_data.h"
 #include "audio_manager.h"
 #include "ota_manager.h"
@@ -31,6 +32,35 @@ static const Question_t *current_quiz_question = NULL;
 static lv_obj_t *quiz_answer_btns[4] = { NULL, NULL, NULL, NULL };
 static int current_subject_id = 0;
 static lv_obj_t *quiz_question_lbl = NULL;
+static lv_obj_t *quiz_typed_input = NULL;
+static lv_obj_t *quiz_typed_keyboard = NULL;
+static lv_obj_t *quiz_typed_submit_btn = NULL;
+
+static const char * const QUIZ_HEBREW_KB_MAP[] = {
+    "ק", "ר", "א", "ט", "ו", "ן", "ם", "פ", LV_SYMBOL_BACKSPACE, "\n",
+    "ש", "ד", "ג", "כ", "ע", "י", "ח", "ל", "ך", "ף", "\n",
+    "ז", "ס", "ב", "ה", "נ", "מ", "צ", "ת", "ץ", "\n",
+    "x", "y", " ", ""
+};
+static const lv_buttonmatrix_ctrl_t QUIZ_HEBREW_KB_CTRL[] = {
+    1, 1, 1, 1, 1, 1, 1, 1, LV_KEYBOARD_CTRL_BUTTON_FLAGS | 2,
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+    1, 1, 1, 1, 1, 1, 1, 1, 1,
+    1, 1, 8
+};
+
+static const char * const QUIZ_NUMBER_KB_MAP[] = {
+    "1", "2", "3", "x", "y", LV_SYMBOL_BACKSPACE, "\n",
+    "4", "5", "6", "a", "b", "=", "m", "\n",
+    "7", "8", "9", "^", "/", "%", ">", "\n",
+    "-", "0", ".", "+", "<", "*", ":", ""
+};
+static const lv_buttonmatrix_ctrl_t QUIZ_NUMBER_KB_CTRL[] = {
+    1, 1, 1, 1, 1, LV_KEYBOARD_CTRL_BUTTON_FLAGS | 2,
+    1, 1, 1, 1, 1, 1, 1,
+    1, 1, 1, 1, 1, 1, 1,
+    1, 1, 1, 1, 1, 1, 1
+};
 
 /* Child Profiles Metadata */
 static const ProfileInfo_t PROFILES_DATA[] = {
@@ -441,6 +471,109 @@ static void refresh_exam_prep_quiz_ui(void) {
     }
 }
 
+static QuizAnswerMode_t quiz_current_answer_mode(void) {
+    if (!current_quiz_question || current_subject_id == AHAVA_SUBJECT_EXAM_PREP) {
+        return QUIZ_ANSWER_MULTIPLE_CHOICE;
+    }
+    if (current_quiz_question->answer_mode >= QUIZ_ANSWER_MULTIPLE_CHOICE &&
+        current_quiz_question->answer_mode <= QUIZ_ANSWER_NUMBER) {
+        return (QuizAnswerMode_t)current_quiz_question->answer_mode;
+    }
+    const uint8_t correct_idx = current_quiz_question->correct_idx;
+    if (correct_idx > 3) return QUIZ_ANSWER_MULTIPLE_CHOICE;
+    return quiz_policy_answer_mode((int)current_profile, current_subject_id,
+                                   current_quiz_question->text,
+                                   current_quiz_question->answers[correct_idx]);
+}
+
+static void on_typed_answer_submit(lv_event_t *e) {
+    const lv_event_code_t code = lv_event_get_code(e);
+    if (code != LV_EVENT_CLICKED && code != LV_EVENT_READY) return;
+    if (!current_quiz_question || !quiz_typed_input || !lv_obj_is_valid(quiz_typed_input)) return;
+
+    const QuizAnswerMode_t mode = quiz_current_answer_mode();
+    if (mode != QUIZ_ANSWER_TEXT && mode != QUIZ_ANSWER_NUMBER) return;
+
+    const char *entered = lv_textarea_get_text(quiz_typed_input);
+    char normalized[192];
+    quiz_policy_normalize_text(entered, normalized, sizeof(normalized));
+    if (!normalized[0]) return;
+
+    const uint8_t correct_idx = current_quiz_question->correct_idx;
+    if (correct_idx > 3) return;
+    const bool correct = quiz_policy_typed_answer_matches(
+        mode, entered, current_quiz_question->answers[correct_idx],
+        current_quiz_question->accepted_answers[0],
+        current_quiz_question->accepted_answers[1],
+        current_quiz_question->accepted_answers[2]);
+
+    /* Reuse the exact existing answer-button path so retry/count/reward rules stay identical. */
+    const uint8_t dispatch_idx = correct ? correct_idx : (uint8_t)((correct_idx + 1u) % 4u);
+    if (!correct) lv_textarea_set_text(quiz_typed_input, "");
+    if (quiz_answer_btns[dispatch_idx] && lv_obj_is_valid(quiz_answer_btns[dispatch_idx])) {
+        lv_obj_add_flag(quiz_answer_btns[dispatch_idx], LV_OBJ_FLAG_CLICKABLE);
+        lv_obj_send_event(quiz_answer_btns[dispatch_idx], LV_EVENT_CLICKED, NULL);
+    }
+}
+
+static void build_typed_answer_ui(lv_obj_t *scr, lv_obj_t *answers_grid, QuizAnswerMode_t mode) {
+    if (!scr || !answers_grid) return;
+    lv_obj_add_flag(answers_grid, LV_OBJ_FLAG_HIDDEN);
+
+    quiz_typed_input = lv_textarea_create(scr);
+    lv_obj_set_size(quiz_typed_input, 205, 54);
+    lv_obj_align(quiz_typed_input, LV_ALIGN_TOP_LEFT, 10, 214);
+    lv_textarea_set_one_line(quiz_typed_input, true);
+    lv_textarea_set_max_length(quiz_typed_input, mode == QUIZ_ANSWER_NUMBER ? 24 : 48);
+    lv_textarea_set_placeholder_text(quiz_typed_input,
+                                     mode == QUIZ_ANSWER_NUMBER ? "הקלד מספר..." : "הקלד תשובה...");
+    lv_obj_set_style_bg_color(quiz_typed_input, lv_color_hex(COLOR_BG_CARD), LV_PART_MAIN);
+    lv_obj_set_style_border_color(quiz_typed_input, lv_color_hex(0x38BDF8), LV_PART_MAIN);
+    lv_obj_set_style_border_width(quiz_typed_input, 2, LV_PART_MAIN);
+    lv_obj_set_style_radius(quiz_typed_input, 12, LV_PART_MAIN);
+    lv_obj_set_style_text_color(quiz_typed_input, lv_color_hex(0xFFFFFF), LV_PART_MAIN);
+    lv_obj_set_style_text_font(quiz_typed_input, &lv_font_hebrew_24, LV_PART_MAIN);
+    lv_obj_set_style_base_dir(quiz_typed_input,
+                              current_subject_id == AHAVA_SUBJECT_ENGLISH ? LV_BASE_DIR_LTR : LV_BASE_DIR_RTL,
+                              LV_PART_MAIN);
+    if (mode == QUIZ_ANSWER_NUMBER) {
+        lv_textarea_set_accepted_chars(quiz_typed_input, "0123456789xyabm=^.,+-/%><*:() ");
+    }
+    lv_obj_add_event_cb(quiz_typed_input, on_typed_answer_submit, LV_EVENT_READY, NULL);
+
+    quiz_typed_submit_btn = lv_button_create(scr);
+    theme_apply_btn_main(quiz_typed_submit_btn);
+    lv_obj_set_size(quiz_typed_submit_btn, 85, 54);
+    lv_obj_align(quiz_typed_submit_btn, LV_ALIGN_TOP_RIGHT, -10, 214);
+    lv_obj_add_event_cb(quiz_typed_submit_btn, on_typed_answer_submit, LV_EVENT_CLICKED, NULL);
+    lv_obj_t *submit_lbl = lv_label_create(quiz_typed_submit_btn);
+    lv_label_set_text(submit_lbl, "בדוק");
+    lv_obj_set_style_text_font(submit_lbl, &lv_font_hebrew_24, LV_PART_MAIN);
+    lv_obj_center(submit_lbl);
+
+    quiz_typed_keyboard = lv_keyboard_create(scr);
+    lv_obj_set_size(quiz_typed_keyboard, 300, 175);
+    lv_obj_align(quiz_typed_keyboard, LV_ALIGN_BOTTOM_MID, 0, -10);
+    lv_keyboard_set_textarea(quiz_typed_keyboard, quiz_typed_input);
+    lv_keyboard_set_popovers(quiz_typed_keyboard, false);
+    lv_obj_set_style_bg_color(quiz_typed_keyboard, lv_color_hex(0x0F172A), LV_PART_MAIN);
+    lv_obj_set_style_bg_color(quiz_typed_keyboard, lv_color_hex(COLOR_BG_CARD), LV_PART_ITEMS);
+    lv_obj_set_style_text_color(quiz_typed_keyboard, lv_color_hex(0xFFFFFF), LV_PART_ITEMS);
+    lv_obj_set_style_text_font(quiz_typed_keyboard, &lv_font_hebrew_16, LV_PART_ITEMS);
+
+    if (mode == QUIZ_ANSWER_NUMBER) {
+        lv_keyboard_set_map(quiz_typed_keyboard, LV_KEYBOARD_MODE_USER_2,
+                            QUIZ_NUMBER_KB_MAP, QUIZ_NUMBER_KB_CTRL);
+        lv_keyboard_set_mode(quiz_typed_keyboard, LV_KEYBOARD_MODE_USER_2);
+    } else if (current_subject_id == AHAVA_SUBJECT_ENGLISH) {
+        lv_keyboard_set_mode(quiz_typed_keyboard, LV_KEYBOARD_MODE_TEXT_LOWER);
+    } else {
+        lv_keyboard_set_map(quiz_typed_keyboard, LV_KEYBOARD_MODE_USER_1,
+                            QUIZ_HEBREW_KB_MAP, QUIZ_HEBREW_KB_CTRL);
+        lv_keyboard_set_mode(quiz_typed_keyboard, LV_KEYBOARD_MODE_USER_1);
+    }
+}
+
 static void on_answer_clicked(lv_event_t *e) {
     if (lv_event_get_code(e) != LV_EVENT_CLICKED) return;
     if (!current_quiz_question) return;
@@ -464,6 +597,7 @@ static void on_answer_clicked(lv_event_t *e) {
     }
 
     bool is_correct = (clicked_idx == current_quiz_question->correct_idx);
+    const bool earns_reward = quiz_active_answer_earns_reward(is_correct);
 
     Serial.printf("[QUIZ] Answer clicked: %u (Correct: %u) -> %s\n",
                   clicked_idx, current_quiz_question->correct_idx,
@@ -501,14 +635,17 @@ static void on_answer_clicked(lv_event_t *e) {
     }
 
     if (is_correct) {
-        player_data_add_coins(current_profile, 10);
-        player_data_add_xp(current_profile, 25);
-
-
-        Serial.printf("[REWARD] Profile %d rewarded! New Coins: %u 🪙 | New XP: %u ⚡\n",
-                      (int)current_profile,
-                      player_data_get_coins(current_profile),
-                      player_data_get_xp(current_profile));
+        if (earns_reward) {
+            player_data_add_coins(current_profile, 10);
+            player_data_add_xp(current_profile, 25);
+            Serial.printf("[REWARD] Profile %d first-try reward! New Coins: %u | New XP: %u\n",
+                          (int)current_profile,
+                          player_data_get_coins(current_profile),
+                          player_data_get_xp(current_profile));
+        } else {
+            Serial.printf("[REWARD] Profile %d retry correct -> learning only, no coins/XP.\n",
+                          (int)current_profile);
+        }
 
         // Correct Answer: Radiant Emerald Green (#10B981)
         lv_obj_set_style_bg_color(clicked_btn, lv_color_hex(0x10B981), LV_PART_MAIN);
@@ -542,7 +679,10 @@ static void on_answer_clicked(lv_event_t *e) {
     lv_obj_center(mbox);
 
     // Title & Feedback Text
-    lv_obj_t *result_title = lv_msgbox_add_title(mbox, is_correct ? "נכון מאוד!" : "כמעט!");
+    const char *result_heading = is_correct
+        ? (earns_reward ? "נכון מאוד!" : "נכון בתיקון — ללא ניקוד")
+        : "כמעט!";
+    lv_obj_t *result_title = lv_msgbox_add_title(mbox, result_heading);
     lv_obj_t *result_text = lv_msgbox_add_text(mbox, current_quiz_question->feedback);
     for (lv_obj_t *label : {result_title, result_text}) {
         if (label) {
@@ -787,6 +927,11 @@ void ui_screen_quiz_init(lv_obj_t *scr) {
         lv_obj_center(btn_lbl);
 
         quiz_answer_btns[i] = btn;
+    }
+
+    const QuizAnswerMode_t answer_mode = quiz_current_answer_mode();
+    if (answer_mode == QUIZ_ANSWER_TEXT || answer_mode == QUIZ_ANSWER_NUMBER) {
+        build_typed_answer_ui(scr, answers_grid, answer_mode);
     }
     if (current_subject_id == AHAVA_SUBJECT_EXAM_PREP) refresh_exam_prep_quiz_ui();
 }
@@ -1814,6 +1959,9 @@ void sm_load_screen(ScreenID_t screen_id) {
     s_muse_orb = NULL;
     s_muse_wifi_lbl = NULL;
     quiz_question_lbl = NULL;
+    quiz_typed_input = NULL;
+    quiz_typed_keyboard = NULL;
+    quiz_typed_submit_btn = NULL;
     for (int i = 0; i < 4; ++i) quiz_answer_btns[i] = NULL;
 
     // 1. Create fresh screen object in PSRAM
